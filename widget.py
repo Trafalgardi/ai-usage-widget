@@ -538,8 +538,6 @@ class TrayManager:
                 if w and w.get("remaining_pct") is not None:
                     result[pid] = round(w["remaining_pct"], 1)
         return result
-
-    def _update_icon_with_data(self):
         pcts = self._get_session_pcts()
         claude_pct = pcts.get("claude")
         codex_pct = pcts.get("codex")
@@ -639,11 +637,10 @@ def refresh_all():
         return
     try:
         providers = {}
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {
                 executor.submit(fetch_claude): "claude",
                 executor.submit(fetch_codex): "codex",
-                # executor.submit(lambda: fetch_opencode(CFG)): "opencode",
             }
             for future in as_completed(futures):
                 name = futures[future]

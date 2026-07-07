@@ -150,14 +150,12 @@
     <div class="page active" id="page-overview"></div>
     <div class="page" id="page-claude"></div>
     <div class="page" id="page-codex"></div>
-    <div class="page" id="page-opencode"></div>
   </div>
 
   <nav>
     <button data-page="overview" class="active">Обзор</button>
     <button data-page="claude" class="n-claude">Claude</button>
     <button data-page="codex" class="n-codex">Codex</button>
-    <button data-page="opencode" class="n-opencode">OpenCode</button>
   </nav>
 </div>
 
@@ -210,7 +208,7 @@ function renderOverview(){
   const el = $("#page-overview");
   if(!DATA){ el.innerHTML = "<div class='empty'>Загрузка…</div>"; return; }
   let html = "";
-  for(const id of ["claude","codex","opencode"]){
+  for(const id of ["claude","codex"]){
     const p = DATA.providers[id] || {};
     const w = sessionWin(p);
     const theme = THEME[id];
@@ -296,7 +294,7 @@ function renderDetail(id){
 
 function renderAll(){
   renderOverview();
-  for(const id of ["claude","codex","opencode"]) renderDetail(id);
+  for(const id of ["claude","codex"]) renderDetail(id);
   if(DATA && DATA.updated_at){
     $("#updated").textContent = "обновлено " + fmtClock(DATA.updated_at);
   }
