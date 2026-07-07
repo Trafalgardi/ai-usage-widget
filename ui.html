@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>AI Usage</title>
+<style>
+  :root{
+    --shell:#101012; --shell-line:#232327; --shell-text:#8b8b93;
+    /* Claude / Anthropic */
+    --cl-bg:#F5F1E8; --cl-ink:#2A261E; --cl-dim:#8a8272; --cl-accent:#D97757; --cl-track:#e6ddcc;
+    /* Codex / OpenAI */
+    --cx-bg:#0B0B0C; --cx-ink:#F2F2F2; --cx-dim:#8E8E93; --cx-track:#232326; --cx-accent:#ffffff;
+    /* OpenCode */
+    --oc-bg:#070707; --oc-ink:#EDEDED; --oc-dim:#6f6f6f; --oc-accent:#fab283; --oc-track:#1c1c1c;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-user-select:none; user-select:none}
+  html,body{height:100%}
+  body{
+    background:var(--shell); color:var(--shell-text); overflow:hidden;
+    font:12px/1.45 "Segoe UI", system-ui, sans-serif;
+    border:1px solid var(--shell-line); border-radius:14px;
+  }
+  .serif{font-family:"Charter","Georgia","Times New Roman",serif}
+  .mono{font-family:"Cascadia Code","JetBrains Mono","Consolas",monospace}
+
+  /* ---------- каркас ---------- */
+  #app{display:flex; flex-direction:column; height:100vh}
+  header{
+    flex:0 0 40px; display:flex; align-items:center; gap:8px; padding:0 10px 0 12px;
+    border-bottom:1px solid var(--shell-line); cursor:move;
+  }
+  header .title{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#c9c9cf}
+  header .updated{font-size:10px; margin-left:auto; color:#5c5c64}
+  header button{
+    background:none; border:none; color:#7a7a82; font-size:14px; width:24px; height:24px;
+    border-radius:6px; cursor:pointer; line-height:1;
+  }
+  header button:hover{background:#1d1d21; color:#e8e8ec}
+  header button.pin-on{color:var(--cl-accent)}
+  header button:focus-visible{outline:1px solid #5a5a64}
+
+  #pages{flex:1; overflow:hidden; position:relative}
+  .page{position:absolute; inset:0; overflow-y:auto; display:none}
+  .page.active{display:block}
+  .page::-webkit-scrollbar{width:0}
+
+  nav{
+    flex:0 0 34px; display:flex; align-items:stretch; border-top:1px solid var(--shell-line);
+  }
+  nav button{
+    flex:1; background:none; border:none; color:#66666e; font-size:10px; letter-spacing:.08em;
+    cursor:pointer; text-transform:uppercase; border-top:2px solid transparent;
+  }
+  nav button.active{color:#ececf1; border-top-color:#ececf1}
+  nav button.n-claude.active{color:var(--cl-accent); border-top-color:var(--cl-accent)}
+  nav button.n-codex.active{border-top-color:#fff; color:#fff}
+  nav button.n-opencode.active{color:var(--oc-accent); border-top-color:var(--oc-accent)}
+
+  /* ---------- обзор ---------- */
+  .strip{padding:14px 16px 16px; border-bottom:1px solid rgba(0,0,0,.25); cursor:pointer}
+  .strip .top{display:flex; align-items:baseline; gap:8px}
+  .strip .glyph{font-size:13px}
+  .strip .name{font-size:13px}
+  .strip .pct{margin-left:auto; font-size:22px; font-weight:600}
+  .strip .sub{display:flex; justify-content:space-between; font-size:10.5px; margin-top:2px}
+  .bar{height:5px; border-radius:3px; margin-top:9px; overflow:hidden}
+  .bar i{display:block; height:100%; border-radius:3px; transition:width .6s ease}
+
+  /* Claude strip / page */
+  .th-claude{background:var(--cl-bg); color:var(--cl-ink)}
+  .th-claude .name{font-family:"Charter",Georgia,serif; letter-spacing:.01em}
+  .th-claude .pct{font-family:"Charter",Georgia,serif; font-weight:500}
+  .th-claude .sub{color:var(--cl-dim)}
+  .th-claude .glyph{color:var(--cl-accent)}
+  .th-claude .bar{background:var(--cl-track)}
+  .th-claude .bar i{background:var(--cl-accent)}
+
+  /* Codex strip / page */
+  .th-codex{background:var(--cx-bg); color:var(--cx-ink)}
+  .th-codex .name{font-weight:600; letter-spacing:-.01em}
+  .th-codex .pct{font-weight:300; letter-spacing:-.02em}
+  .th-codex .sub{color:var(--cx-dim)}
+  .th-codex .glyph{color:#fff}
+  .th-codex .bar{background:var(--cx-track)}
+  .th-codex .bar i{background:linear-gradient(90deg,#d8d8d8,#ffffff)}
+
+  /* OpenCode strip / page */
+  .th-opencode{background:var(--oc-bg); color:var(--oc-ink);
+    font-family:"Cascadia Code","JetBrains Mono",Consolas,monospace}
+  .th-opencode .name{font-size:12px}
+  .th-opencode .name::before{content:"▌"; color:var(--oc-accent); margin-right:4px}
+  .th-opencode .pct{font-weight:400; font-size:20px}
+  .th-opencode .sub{color:var(--oc-dim); font-size:10px}
+  .th-opencode .bar{background:transparent; height:auto; margin-top:8px}
+  .th-opencode .asciibar{font-size:11px; letter-spacing:1px; color:var(--oc-accent); white-space:nowrap}
+  .th-opencode .asciibar .off{color:#2c2c2c}
+
+  .strip .err{font-size:10.5px; margin-top:6px; opacity:.75; line-height:1.4}
+
+  /* ---------- детальные страницы ---------- */
+  .detail{min-height:100%; padding:18px 18px 24px}
+  .detail .brand{display:flex; align-items:center; gap:8px; margin-bottom:2px}
+  .detail .brand .glyph{font-size:16px}
+  .detail h1{font-size:19px; font-weight:600}
+  .th-claude.detail h1{font-family:"Charter",Georgia,serif; font-weight:500}
+  .detail .plan{font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; opacity:.6; margin-bottom:14px}
+
+  .win{margin-top:14px}
+  .win .head{display:flex; align-items:baseline}
+  .win .label{font-size:11px; letter-spacing:.1em; text-transform:uppercase; opacity:.65}
+  .th-opencode .win .label{text-transform:none; letter-spacing:0}
+  .th-opencode .win .label::before{content:"$ "}
+  .win .bigpct{margin-left:auto; font-size:26px}
+  .th-claude .win .bigpct{font-family:"Charter",Georgia,serif; color:var(--cl-ink)}
+  .th-codex .win .bigpct{font-weight:200}
+  .win .bigpct small{font-size:12px; opacity:.55}
+  .win .bar{margin-top:7px}
+  .win .reset{display:flex; justify-content:space-between; font-size:10.5px; margin-top:6px; opacity:.65}
+  .win .usd{font-size:10.5px; margin-top:3px; opacity:.65}
+
+  .detail .meta{margin-top:20px; padding-top:12px; border-top:1px dashed rgba(128,128,128,.35);
+    font-size:10.5px; line-height:1.7; opacity:.75}
+  .detail .error{
+    margin-top:16px; font-size:11px; line-height:1.55; padding:10px 12px; border-radius:8px;
+    background:rgba(128,128,128,.12); border:1px solid rgba(128,128,128,.25);
+    -webkit-user-select:text; user-select:text;
+  }
+  .th-claude .error{background:#ece5d6; border-color:#d9cfb9; color:#6b6353}
+
+  .low i{background:#c8452c !important}
+  .th-codex .low i{background:#ff5c47 !important}
+  .th-opencode .low{color:#ff5c47 !important}
+
+  .empty{padding:28px 18px; text-align:center; opacity:.55; font-size:11px; line-height:1.6}
+  @media (prefers-reduced-motion: reduce){ .bar i{transition:none} }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="pywebview-drag-region">
+    <span class="title">AI&nbsp;Usage</span>
+    <span class="updated" id="updated">…</span>
+    <button id="btn-refresh" title="Обновить">⟳</button>
+    <button id="btn-pin" title="Поверх окон">◉</button>
+    <button id="btn-tray" title="В трей">⎯</button>
+    <button id="btn-close" title="Закрыть">✕</button>
+  </header>
+
+  <div id="pages">
+    <div class="page active" id="page-overview"></div>
+    <div class="page" id="page-claude"></div>
+    <div class="page" id="page-codex"></div>
+    <div class="page" id="page-opencode"></div>
+  </div>
+
+  <nav>
+    <button data-page="overview" class="active">Обзор</button>
+    <button data-page="claude" class="n-claude">Claude</button>
+    <button data-page="codex" class="n-codex">Codex</button>
+    <button data-page="opencode" class="n-opencode">OpenCode</button>
+  </nav>
+</div>
+
+<script>
+"use strict";
+let DATA = null;           // последний снимок от бэкенда
+let clockSkew = 0;         // now(сервер) - now(клиент)
+
+const GLYPH = { claude:"✳", codex:"⬡", opencode:"█" };
+const THEME = { claude:"th-claude", codex:"th-codex", opencode:"th-opencode" };
+
+/* ---------- утилиты ---------- */
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function now(){ return Date.now()/1000 + clockSkew; }
+
+function fmtCountdown(epoch){
+  if(!epoch) return "";
+  let s = Math.max(0, epoch - now());
+  const d = Math.floor(s/86400); s -= d*86400;
+  const h = Math.floor(s/3600);  s -= h*3600;
+  const m = Math.floor(s/60);
+  if(d > 0) return `${d} д ${h} ч`;
+  if(h > 0) return `${h} ч ${m} м`;
+  return `${m} м`;
+}
+function fmtClock(epoch){
+  if(!epoch) return "";
+  const dt = new Date(epoch*1000);
+  const t = dt.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  const today = new Date(); 
+  const same = dt.toDateString() === today.toDateString();
+  return same ? t : dt.toLocaleDateString([], {day:"numeric", month:"short"}) + " " + t;
+}
+function pctText(w){
+  if(w.remaining_pct == null) return "—";
+  return (Math.round(w.remaining_pct*10)/10).toLocaleString("ru-RU");
+}
+function asciiBar(pctRemaining, width=18){
+  if(pctRemaining == null) return "";
+  const on = Math.round(width * pctRemaining / 100);
+  return "<span>" + "█".repeat(on) + "</span><span class='off'>" + "░".repeat(width-on) + "</span>";
+}
+function sessionWin(p){
+  return (p.windows||[]).find(w => w.id === "session") || (p.windows||[])[0] || null;
+}
+
+/* ---------- обзор ---------- */
+function renderOverview(){
+  const el = $("#page-overview");
+  if(!DATA){ el.innerHTML = "<div class='empty'>Загрузка…</div>"; return; }
+  let html = "";
+  for(const id of ["claude","codex","opencode"]){
+    const p = DATA.providers[id] || {};
+    const w = sessionWin(p);
+    const theme = THEME[id];
+    const low = w && w.remaining_pct != null && w.remaining_pct <= 15 ? "low" : "";
+    html += `<div class="strip ${theme}" data-goto="${id}">
+      <div class="top">
+        <span class="glyph">${GLYPH[id]}</span>
+        <span class="name">${esc(p.name || id)}</span>
+        <span class="pct">${w ? pctText(w) + "<small style='font-size:11px;opacity:.5'>%</small>" : "—"}</span>
+      </div>`;
+    if(w){
+      html += `<div class="sub">
+          <span>${esc(w.label)} · остаток</span>
+          <span>${w.resets_at ? "сброс через " + fmtCountdown(w.resets_at) : ""}</span>
+        </div>`;
+      if(id === "opencode"){
+        html += `<div class="bar ${low}"><div class="asciibar ${low}">${asciiBar(w.remaining_pct)}</div></div>`;
+      } else {
+        html += `<div class="bar ${low}"><i style="width:${w.remaining_pct ?? 0}%"></i></div>`;
+      }
+    } else {
+      html += `<div class="err">${esc(p.error || "нет данных")}</div>`;
+    }
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll(".strip").forEach(s =>
+    s.addEventListener("click", () => showPage(s.dataset.goto)));
+}
+
+/* ---------- детальная страница ---------- */
+function renderDetail(id){
+  const el = $("#page-" + id);
+  const p = DATA && DATA.providers[id];
+  if(!p){ el.innerHTML = "<div class='empty'>Загрузка…</div>"; return; }
+
+  let html = `<div class="detail ${THEME[id]}">
+    <div class="brand"><span class="glyph">${GLYPH[id]}</span><h1>${esc(p.name)}</h1></div>
+    <div class="plan">${esc(p.meta && (p.meta.plan || p.meta.subscription) || "подписка")}</div>`;
+
+  for(const w of (p.windows || [])){
+    const low = w.remaining_pct != null && w.remaining_pct <= 15 ? "low" : "";
+    html += `<div class="win">
+      <div class="head">
+        <span class="label">${esc(w.label)}</span>
+        <span class="bigpct ${id==='opencode'&&low?'low':''}">${pctText(w)}<small> % остаток</small></span>
+      </div>`;
+    if(id === "opencode"){
+      html += `<div class="bar"><div class="asciibar ${low}">${asciiBar(w.remaining_pct, 24)}</div></div>`;
+    } else {
+      html += `<div class="bar ${low}"><i style="width:${w.remaining_pct ?? 0}%"></i></div>`;
+    }
+    if(w.used_usd != null && w.limit_usd != null){
+      html += `<div class="usd">$${(+w.used_usd).toFixed(2)} из $${(+w.limit_usd).toFixed(2)}</div>`;
+    }
+    if(w.resets_at){
+      html += `<div class="reset" data-reset="${w.resets_at}">
+        <span>сброс через ${fmtCountdown(w.resets_at)}</span>
+        <span>${fmtClock(w.resets_at)}</span></div>`;
+    }
+    html += `</div>`;
+  }
+
+  if(!p.ok && p.error){
+    html += `<div class="error">${esc(p.error)}</div>`;
+  }
+
+  // мета-инфо
+  const metaBits = [];
+  if(p.meta){
+    if(p.meta.credits != null) metaBits.push("Кредиты: " + p.meta.credits);
+    if(p.meta.balance_usd != null) metaBits.push("Баланс: $" + (+p.meta.balance_usd).toFixed(2));
+    if(p.meta.extra_usage) metaBits.push("Extra usage: " + JSON.stringify(p.meta.extra_usage));
+    if(p.meta.endpoint) metaBits.push("Источник: " + p.meta.endpoint);
+    if(p.meta.token_stale) metaBits.push("⚠ токен истёк — открой CLI и залогинься");
+  }
+  if(metaBits.length){
+    html += `<div class="meta">${metaBits.map(esc).join("<br>")}</div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function renderAll(){
+  renderOverview();
+  for(const id of ["claude","codex","opencode"]) renderDetail(id);
+  if(DATA && DATA.updated_at){
+    $("#updated").textContent = "обновлено " + fmtClock(DATA.updated_at);
+  }
+}
+
+/* ---------- навигация ---------- */
+function showPage(id){
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  $("#page-" + id).classList.add("active");
+  document.querySelectorAll("nav button").forEach(b =>
+    b.classList.toggle("active", b.dataset.page === id));
+}
+document.querySelectorAll("nav button").forEach(b =>
+  b.addEventListener("click", () => showPage(b.dataset.page)));
+
+/* ---------- связь с бэкендом ---------- */
+async function pull(){
+  if(!window.pywebview || !window.pywebview.api) return;
+  try{
+    const snap = await window.pywebview.api.get_data();
+    if(snap && snap.updated_at){
+      clockSkew = snap.now - Date.now()/1000;
+      DATA = snap;
+      renderAll();
+    }
+  }catch(e){ /* бэкенд ещё поднимается */ }
+}
+
+window.addEventListener("pywebviewready", () => {
+  pull();
+  setInterval(pull, 5000);
+  setInterval(() => { if(DATA) renderAll(); }, 30000);
+  let refreshDebounce = false;
+  $("#btn-refresh").addEventListener("click", async () => {
+    if(refreshDebounce) return;
+    refreshDebounce = true;
+    $("#btn-refresh").style.opacity = "0.5";
+    try {
+      await window.pywebview.api.refresh_now();
+      setTimeout(pull, 1500);
+      setTimeout(pull, 4000);
+    } finally {
+      setTimeout(() => {
+        refreshDebounce = false;
+        $("#btn-refresh").style.opacity = "";
+      }, 5000);
+    }
+  });
+  $("#btn-close").addEventListener("click", () => window.pywebview.api.close());
+  const trayBtn = $("#btn-tray");
+  if(trayBtn) {
+    trayBtn.addEventListener("click", async () => {
+      const result = await window.pywebview.api.minimize_to_tray();
+      if(!result) {
+        console.log("Tray not available");
+      }
+    });
+  }
+  const pinBtn = $("#btn-pin");
+  pinBtn.classList.add("pin-on");
+  pinBtn.addEventListener("click", async () => {
+    const v = await window.pywebview.api.toggle_on_top();
+    pinBtn.classList.toggle("pin-on", !!v);
+  });
+  setInterval(async () => {
+    if(DATA) {
+      await window.pywebview.api.update_tray_icon();
+    }
+  }, 5000);
+});
+
+// демо-режим при открытии файла в браузере без pywebview
+setTimeout(() => {
+  if(window.pywebview) return;
+  clockSkew = 0;
+  DATA = {updated_at: Date.now()/1000, providers: {
+    claude:{id:"claude",name:"Claude Code",ok:true,meta:{subscription:"max"},windows:[
+      {id:"session",label:"Сессия (5 ч)",remaining_pct:64,resets_at:Date.now()/1000+7620},
+      {id:"week",label:"Неделя",remaining_pct:41,resets_at:Date.now()/1000+3600*52},
+      {id:"week_opus",label:"Неделя · Opus",remaining_pct:88,resets_at:Date.now()/1000+3600*52}]},
+    codex:{id:"codex",name:"Codex CLI",ok:true,meta:{plan:"plus"},windows:[
+      {id:"session",label:"Сессия (5 ч)",remaining_pct:73,resets_at:Date.now()/1000+4980},
+      {id:"week",label:"Неделя",remaining_pct:12,resets_at:Date.now()/1000+3600*30}]},
+    opencode:{id:"opencode",name:"OpenCode",ok:true,meta:{plan:"go"},windows:[
+      {id:"session",label:"Сессия (5 ч)",remaining_pct:81,used_usd:2.3,limit_usd:12,resets_at:Date.now()/1000+9000},
+      {id:"week",label:"Неделя",remaining_pct:70,used_usd:9,limit_usd:30,resets_at:Date.now()/1000+3600*90},
+      {id:"month",label:"Месяц",remaining_pct:75,used_usd:15,limit_usd:60,resets_at:Date.now()/1000+3600*400}]}
+  }};
+  renderAll();
+}, 800);
+</script>
+</body>
+</html>
