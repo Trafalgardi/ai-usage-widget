@@ -510,10 +510,33 @@ class TrayManager:
         self.window_ref = None
         self._thread = None
 
-    def _create_icon_image(self, text="", color="#FFFFFF", outline=None):
+    def _create_icon_image(self, text="", color="#FFFFFF", outline=None, bg_color=None):
         size = 64
         img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
+        
+        # Создаём круглый градиентный фон
+        if bg_color:
+            # Используем переданный цвет фона
+            r, g, b = bg_color
+            for i in range(32):
+                ratio = i / 32
+                cr = int(r * (1 - ratio) + 80 * ratio)
+                cg = int(g * (1 - ratio) + 80 * ratio)
+                cb = int(b * (1 - ratio) + 100 * ratio)
+                draw.ellipse([i, i, size-i, size-i], fill=(cr, cg, cb, 255))
+        else:
+            # Стандартный оранжевый градиент
+            for i in range(32):
+                ratio = i / 32
+                r = int(217 * (1 - ratio) + 80 * ratio)
+                g = int(119 * (1 - ratio) + 80 * ratio)
+                b = int(87 * (1 - ratio) + 100 * ratio)
+                draw.ellipse([i, i, size-i, size-i], fill=(r, g, b, 255))
+        
+        # Белая обводка
+        draw.ellipse([2, 2, size-2, size-2], outline=(255, 255, 255, 200), width=2)
+        
         try:
             font = ImageFont.truetype("arialbd.ttf", 48)
         except Exception:
@@ -521,11 +544,20 @@ class TrayManager:
                 font = ImageFont.truetype("arial.ttf", 48)
             except Exception:
                 font = ImageFont.load_default()
+        
         if text:
             if outline:
                 draw.text((size//2, size//2), text, fill=color, font=font, anchor="mm", stroke_width=3, stroke_fill=outline)
             else:
                 draw.text((size//2, size//2), text, fill=color, font=font, anchor="mm")
+        else:
+            # Иконка по умолчанию - символ графика
+            try:
+                emoji_font = ImageFont.truetype("seguiemj.ttf", 36)
+                draw.text((size//2, size//2), "📊", fill="white", font=emoji_font, anchor="mm")
+            except Exception:
+                draw.text((size//2, size//2), "U", fill="white", font=font, anchor="mm")
+        
         return img
 
     def _get_session_pcts(self):
@@ -539,6 +571,8 @@ class TrayManager:
                 if w and w.get("remaining_pct") is not None:
                     result[pid] = round(w["remaining_pct"], 1)
         return result
+
+    def _update_icon_with_data(self):
         pcts = self._get_session_pcts()
         claude_pct = pcts.get("claude")
         codex_pct = pcts.get("codex")
@@ -546,13 +580,15 @@ class TrayManager:
         codex_text = f"{int(codex_pct):02d}" if codex_pct is not None else "--"
         try:
             if self.icon_claude:
-                img_claude = self._create_icon_image(claude_text, color="#D97757")
+                img_claude = self._create_icon_image(claude_text, color="#FFFFFF", bg_color=(217, 119, 87))
                 self.icon_claude.icon = img_claude
             if self.icon_codex:
-                img_codex = self._create_icon_image(codex_text, color="#2ECC40", outline="#1a7a25")
+                img_codex = self._create_icon_image(codex_text, color="#FFFFFF", bg_color=(46, 204, 64))
                 self.icon_codex.icon = img_codex
         except Exception as e:
             print(f"Tray: icon update error: {e}")
+
+    def _build_tooltip(self):
         with STATE.lock:
             snap = copy.deepcopy(STATE.snapshot)
         if not snap.get("updated_at"):
@@ -603,8 +639,8 @@ class TrayManager:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Выход", self._on_quit),
         )
-        img_claude = self._create_icon_image("--", color="#D97757")
-        img_codex = self._create_icon_image("--", color="#2ECC40", outline="#1a7a25")
+        img_claude = self._create_icon_image("--", color="#FFFFFF", bg_color=(217, 119, 87))
+        img_codex = self._create_icon_image("--", color="#FFFFFF", bg_color=(46, 204, 64))
         self.icon_claude = pystray.Icon("ai-usage-claude", img_claude, "Claude Code", menu)
         self.icon_codex = pystray.Icon("ai-usage-codex", img_codex, "Codex CLI", menu)
         self._thread_claude = threading.Thread(target=self.icon_claude.run, daemon=True)
