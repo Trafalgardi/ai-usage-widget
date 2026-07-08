@@ -139,12 +139,39 @@
   .th-codex .login-btn{background:#fff; color:#000}
   .th-codex .login-btn:hover:not(:disabled){background:#e0e0e0}
   
+  .login-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.85); backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center; z-index:1000;
+    animation:fadeIn .2s ease;
+  }
+  .login-overlay.hidden{display:none}
+  .login-box{
+    background:#1a1a1e; border:1px solid #2a2a2e; border-radius:12px;
+    padding:24px; max-width:320px; width:90%; text-align:center;
+  }
+  .login-box h3{margin:0 0 12px; font-size:14px; color:#ececf1}
+  .login-box p{margin:0 0 16px; font-size:11px; color:#8b8b93; line-height:1.5}
+  .login-spinner{
+    width:32px; height:32px; margin:0 auto 16px;
+    border:3px solid #2a2a2e; border-top-color:#d97757;
+    border-radius:50%; animation:spin 1s linear infinite;
+  }
+  .login-box.success .login-spinner{border-top-color:#2ECC40}
+  .login-box.error .login-spinner{border-top-color:#ff4444; animation:none}
   .login-output{
-    margin-top:12px; padding:10px 12px; border-radius:8px; font-size:10.5px;
-    background:rgba(0,0,0,.3); color:#8b8b93; white-space:pre-wrap; word-break:break-all;
-    max-height:200px; overflow-y:auto; -webkit-user-select:text; user-select:text;
+    margin-top:12px; padding:10px; border-radius:8px; font-size:10px;
+    background:#0a0a0c; color:#8b8b93; white-space:pre-wrap; word-break:break-all;
+    max-height:150px; overflow-y:auto; text-align:left;
     font-family:"Cascadia Code","JetBrains Mono",Consolas,monospace;
   }
+  .login-close{
+    margin-top:16px; padding:8px 20px; border:none; border-radius:6px;
+    background:#2a2a2e; color:#ececf1; font-size:11px; cursor:pointer;
+  }
+  .login-close:hover{background:#3a3a3e}
+  
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes spin{to{transform:rotate(360deg)}}
 
   .low i{background:#c8452c !important}
   .th-codex .low i{background:#ff5c47 !important}
@@ -316,28 +343,58 @@ function renderDetail(id){
   el.querySelectorAll(".login-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const provider = btn.dataset.provider;
+      const providerName = provider === "claude" ? "Claude Code" : "Codex CLI";
+      
+      // Показываем оверлей
+      const overlay = document.createElement("div");
+      overlay.className = "login-overlay";
+      overlay.innerHTML = `
+        <div class="login-box">
+          <div class="login-spinner"></div>
+          <h3>Вход в ${providerName}</h3>
+          <p>Откроется браузер для авторизации. После входа вернитесь сюда.</p>
+          <div class="login-output" style="display:none"></div>
+          <button class="login-close" style="display:none">Закрыть</button>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      
       btn.disabled = true;
       btn.textContent = " Выпускается…";
+      
       try {
         const result = provider === "claude" 
           ? await window.pywebview.api.login_claude()
           : await window.pywebview.api.login_codex();
         
-        const outputEl = document.createElement("div");
-        outputEl.className = "login-output";
+        const box = overlay.querySelector(".login-box");
+        const outputEl = overlay.querySelector(".login-output");
+        const closeBtn = overlay.querySelector(".login-close");
+        const spinner = overlay.querySelector(".login-spinner");
+        
+        outputEl.style.display = "block";
         outputEl.textContent = result.output || "Команда выполнена";
-        el.appendChild(outputEl);
+        closeBtn.style.display = "inline-block";
         
         if(result.success){
-          btn.textContent = " Успешно!";
+          box.classList.add("success");
+          overlay.querySelector("h3").textContent = "Успешно!";
+          overlay.querySelector("p").textContent = "Данные обновятся автоматически";
           setTimeout(() => window.pywebview.api.refresh_now(), 1000);
         } else {
-          btn.textContent = " Ошибка";
-          btn.disabled = false;
+          box.classList.add("error");
+          overlay.querySelector("h3").textContent = "Ошибка";
         }
+        
+        closeBtn.addEventListener("click", () => {
+          overlay.remove();
+          btn.disabled = false;
+          btn.textContent = " Войти через CLI";
+        });
       } catch(e){
-        btn.textContent = " Ошибка";
+        overlay.remove();
         btn.disabled = false;
+        btn.textContent = " Ошибка";
       }
     });
   });
