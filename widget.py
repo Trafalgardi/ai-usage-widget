@@ -15,6 +15,7 @@ import base64
 import copy
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -680,6 +681,44 @@ class JsApi:
             return False
         threading.Thread(target=refresh_all, daemon=True).start()
         return True
+
+    def login_claude(self):
+        try:
+            result = subprocess.run(
+                ["claude", "login"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                encoding='utf-8',
+                errors='replace'
+            )
+            output = result.stdout + result.stderr
+            return {"success": result.returncode == 0, "output": output}
+        except FileNotFoundError:
+            return {"success": False, "output": "Claude CLI не найден. Установи: npm install -g @anthropic-ai/claude-code"}
+        except subprocess.TimeoutExpired:
+            return {"success": False, "output": "Превышено время ожидания (120 сек)"}
+        except Exception as e:
+            return {"success": False, "output": f"Ошибка: {str(e)}"}
+
+    def login_codex(self):
+        try:
+            result = subprocess.run(
+                ["codex", "login"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                encoding='utf-8',
+                errors='replace'
+            )
+            output = result.stdout + result.stderr
+            return {"success": result.returncode == 0, "output": output}
+        except FileNotFoundError:
+            return {"success": False, "output": "Codex CLI не найден. Установи: npm install -g @openai/codex"}
+        except subprocess.TimeoutExpired:
+            return {"success": False, "output": "Превышено время ожидания (120 сек)"}
+        except Exception as e:
+            return {"success": False, "output": f"Ошибка: {str(e)}"}
 
     def toggle_on_top(self):
         try:
