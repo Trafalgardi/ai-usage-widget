@@ -689,55 +689,30 @@ class JsApi:
         threading.Thread(target=refresh_all, daemon=True).start()
         return True
 
-    def login_claude(self):
+    def _run_cli_login(self, command):
+        """Запускает CLI-команду в отдельной консоли и ждёт завершения."""
         try:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0  # SW_HIDE
-            
-            result = subprocess.run(
-                ["claude", "login"],
-                capture_output=True,
-                text=True,
-                timeout=120,
+            proc = subprocess.Popen(
+                command,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
                 encoding='utf-8',
-                errors='replace',
-                startupinfo=startupinfo,
-                creationflags=subprocess.CREATE_NO_WINDOW
+                errors='replace'
             )
-            output = result.stdout + result.stderr
-            return {"success": result.returncode == 0, "output": output}
+            proc.wait(timeout=120)
+            return {"success": proc.returncode == 0, "output": f"Процесс завершён с кодом {proc.returncode}"}
         except FileNotFoundError:
-            return {"success": False, "output": "Claude CLI не найден. Установи: npm install -g @anthropic-ai/claude-code"}
+            return {"success": False, "output": f"CLI не найден. Установи через npm"}
         except subprocess.TimeoutExpired:
+            proc.kill()
             return {"success": False, "output": "Превышено время ожидания (120 сек)"}
         except Exception as e:
             return {"success": False, "output": f"Ошибка: {str(e)}"}
 
+    def login_claude(self):
+        return self._run_cli_login(["claude", "login"])
+
     def login_codex(self):
-        try:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0  # SW_HIDE
-            
-            result = subprocess.run(
-                ["codex", "login"],
-                capture_output=True,
-                text=True,
-                timeout=120,
-                encoding='utf-8',
-                errors='replace',
-                startupinfo=startupinfo,
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-            output = result.stdout + result.stderr
-            return {"success": result.returncode == 0, "output": output}
-        except FileNotFoundError:
-            return {"success": False, "output": "Codex CLI не найден. Установи: npm install -g @openai/codex"}
-        except subprocess.TimeoutExpired:
-            return {"success": False, "output": "Превышено время ожидания (120 сек)"}
-        except Exception as e:
-            return {"success": False, "output": f"Ошибка: {str(e)}"}
+        return self._run_cli_login(["codex", "login"])
 
     def toggle_on_top(self):
         try:
