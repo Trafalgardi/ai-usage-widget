@@ -681,7 +681,64 @@ class JsApi:
             snap = copy.deepcopy(STATE.snapshot)
         snap["now"] = time.time()
         snap["refresh_interval_sec"] = CFG.get("refresh_interval_sec", 60)
+        snap["token_status"] = self.get_token_status()
         return snap
+
+    def get_token_status(self):
+        """Проверяет статус токенов Claude и Codex."""
+        result = {"claude": None, "codex": None}
+        
+        # Claude
+        cred_paths = [
+            os.path.join(HOME, ".claude", ".credentials.json"),
+            os.path.join(HOME, ".config", "claude", ".credentials.json"),
+        ]
+        for p in cred_paths:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    oauth = data.get("claudeAiOauth") or data.get("oauth") or {}
+                    exp = oauth.get("expiresAt")
+                    if exp:
+                        exp_epoch = iso_to_epoch(exp)
+                        if exp_epoch:
+                            now = time.time()
+                            remaining = exp_epoch - now
+                            if remaining <= 0:
+                                result["claude"] = {"status": "expired", "remaining": 0}
+                            elif remaining < 3600:
+                                result["claude"] = {"status": "expiring", "remaining": remaining}
+                            else:
+                                result["claude"] = {"status": "valid", "remaining": remaining}
+                except Exception:
+                    pass
+                break
+        
+        # Codex
+        auth_path = os.path.join(_codex_home(), "auth.json")
+        if os.path.exists(auth_path):
+            try:
+                with open(auth_path, "r", encoding="utf-8") as f:
+                    auth = json.load(f)
+                tokens = auth.get("tokens") or {}
+                access = tokens.get("access_token") or auth.get("access_token")
+                if access:
+                    claims = _jwt_claims(access)
+                    exp = claims.get("exp")
+                    if exp:
+                        now = time.time()
+                        remaining = exp - now
+                        if remaining <= 0:
+                            result["codex"] = {"status": "expired", "remaining": 0}
+                        elif remaining < 3600:
+                            result["codex"] = {"status": "expiring", "remaining": remaining}
+                        else:
+                            result["codex"] = {"status": "valid", "remaining": remaining}
+            except Exception:
+                pass
+        
+        return result
 
     def refresh_now(self):
         if STATE.refresh_lock.locked():
@@ -689,30 +746,91 @@ class JsApi:
         threading.Thread(target=refresh_all, daemon=True).start()
         return True
 
-    def _run_cli_login(self, command):
-        """Запускает CLI-команду в отдельной консоли и ждёт завершения."""
+    def login_claude(self):
+        """Запускает claude login в фоне."""
         try:
             proc = subprocess.Popen(
-                command,
+                ["claude", "login"],
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
                 encoding='utf-8',
                 errors='replace'
             )
-            proc.wait(timeout=120)
-            return {"success": proc.returncode == 0, "output": f"Процесс завершён с кодом {proc.returncode}"}
+            return {"success": True, "output": "Авторизация запущена"}
         except FileNotFoundError:
-            return {"success": False, "output": f"CLI не найден. Установи через npm"}
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            return {"success": False, "output": "Превышено время ожидания (120 сек)"}
+            return {"success": False, "output": "Claude CLI не найден"}
         except Exception as e:
             return {"success": False, "output": f"Ошибка: {str(e)}"}
 
-    def login_claude(self):
-        return self._run_cli_login(["claude", "login"])
-
     def login_codex(self):
-        return self._run_cli_login(["codex", "login"])
+        """Запускает codex login в фоне."""
+        try:
+            proc = subprocess.Popen(
+                ["codex", "login"],
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                encoding='utf-8',
+                errors='replace'
+            )
+            return {"success": True, "output": "Авторизация запущена"}
+        except FileNotFoundError:
+            return {"success": False, "output": "Codex CLI не найден"}
+        except Exception as e:
+            return {"success": False, "output": f"Ошибка: {str(e)}"}
+    
+    def get_token_status(self):
+        """Проверяет статус токенов Claude и Codex."""
+        result = {"claude": None, "codex": None}
+        
+        # Claude
+        cred_paths = [
+            os.path.join(HOME, ".claude", ".credentials.json"),
+            os.path.join(HOME, ".config", "claude", ".credentials.json"),
+        ]
+        for p in cred_paths:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    oauth = data.get("claudeAiOauth") or data.get("oauth") or {}
+                    exp = oauth.get("expiresAt")
+                    if exp:
+                        exp_epoch = iso_to_epoch(exp)
+                        if exp_epoch:
+                            now = time.time()
+                            remaining = exp_epoch - now
+                            if remaining <= 0:
+                                result["claude"] = {"status": "expired", "remaining": 0}
+                            elif remaining < 3600:
+                                result["claude"] = {"status": "expiring", "remaining": remaining}
+                            else:
+                                result["claude"] = {"status": "valid", "remaining": remaining}
+                except Exception:
+                    pass
+                break
+        
+        # Codex
+        auth_path = os.path.join(_codex_home(), "auth.json")
+        if os.path.exists(auth_path):
+            try:
+                with open(auth_path, "r", encoding="utf-8") as f:
+                    auth = json.load(f)
+                tokens = auth.get("tokens") or {}
+                access = tokens.get("access_token") or auth.get("access_token")
+                if access:
+                    claims = _jwt_claims(access)
+                    exp = claims.get("exp")
+                    if exp:
+                        now = time.time()
+                        remaining = exp - now
+                        if remaining <= 0:
+                            result["codex"] = {"status": "expired", "remaining": 0}
+                        elif remaining < 3600:
+                            result["codex"] = {"status": "expiring", "remaining": remaining}
+                        else:
+                            result["codex"] = {"status": "valid", "remaining": remaining}
+            except Exception:
+                pass
+        
+        return result
 
     def toggle_on_top(self):
         try:
