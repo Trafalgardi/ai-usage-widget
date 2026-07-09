@@ -31,6 +31,7 @@
   }
   header .title{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#c9c9cf}
   header .updated{font-size:10px; margin-left:auto; color:#5c5c64}
+  header .countdown{font-size:10px; color:#5c5c64; font-variant-numeric:tabular-nums; min-width:28px; text-align:right}
   header button{
     background:none; border:none; color:#7a7a82; font-size:14px; width:24px; height:24px;
     border-radius:6px; cursor:pointer; line-height:1;
@@ -154,6 +155,34 @@
   .th-opencode .low{color:#ff5c47 !important}
 
   .empty{padding:28px 18px; text-align:center; opacity:.55; font-size:11px; line-height:1.6}
+  
+  /* ---------- настройки ---------- */
+  .settings{padding:18px; min-height:100%}
+  .settings h2{font-size:16px; margin:0 0 16px; color:#ececf1}
+  .settings .section{margin-bottom:20px}
+  .settings .section-title{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#5c5c64; margin-bottom:10px}
+  .settings .field{margin-bottom:12px}
+  .settings label{display:block; font-size:11px; color:#8b8b93; margin-bottom:4px}
+  .settings input[type="number"], .settings input[type="text"]{
+    width:100%; padding:8px 10px; background:#1a1a1e; border:1px solid #2a2a2e;
+    border-radius:6px; color:#ececf1; font-size:12px; box-sizing:border-box;
+  }
+  .settings input:focus{outline:none; border-color:#d97757}
+  .settings .toggle-row{display:flex; align-items:center; justify-content:space-between; padding:8px 0}
+  .settings .toggle-row label{margin:0}
+  .settings .switch{position:relative; width:40px; height:22px; flex-shrink:0}
+  .settings .switch input{opacity:0; width:0; height:0}
+  .settings .slider{position:absolute; inset:0; background:#2a2a2e; border-radius:22px; cursor:pointer; transition:.3s}
+  .settings .slider:before{content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.3s}
+  .settings .switch input:checked + .slider{background:#d97757}
+  .settings .switch input:checked + .slider:before{transform:translateX(18px)}
+  .settings .save-btn{
+    width:100%; padding:10px; border:none; border-radius:8px;
+    background:#d97757; color:#fff; font-size:12px; cursor:pointer; margin-top:8px;
+  }
+  .settings .save-btn:hover{background:#c96747}
+  .settings .save-btn:disabled{opacity:.6; cursor:not-allowed}
+  .settings .saved-msg{font-size:11px; color:#2ECC40; margin-top:8px; text-align:center}
   @media (prefers-reduced-motion: reduce){ .bar i{transition:none} }
 </style>
 </head>
@@ -162,6 +191,7 @@
   <header class="pywebview-drag-region">
     <span class="title">AI&nbsp;Usage</span>
     <span class="updated" id="updated">…</span>
+    <span class="countdown" id="countdown"></span>
     <button id="btn-refresh" title="Обновить">⟳</button>
     <button id="btn-pin" title="Поверх окон">◉</button>
     <button id="btn-tray" title="В трей">⎯</button>
@@ -172,12 +202,14 @@
     <div class="page active" id="page-overview"></div>
     <div class="page" id="page-claude"></div>
     <div class="page" id="page-codex"></div>
+    <div class="page" id="page-settings"></div>
   </div>
 
   <nav>
     <button data-page="overview" class="active">Обзор</button>
     <button data-page="claude" class="n-claude">Claude</button>
     <button data-page="codex" class="n-codex">Codex</button>
+    <button data-page="settings">Настройки</button>
   </nav>
 </div>
 
@@ -314,7 +346,6 @@ function renderDetail(id){
   if(p.meta){
     if(p.meta.credits != null) metaBits.push("Кредиты: " + p.meta.credits);
     if(p.meta.balance_usd != null) metaBits.push("Баланс: $" + (+p.meta.balance_usd).toFixed(2));
-    if(p.meta.extra_usage) metaBits.push("Extra usage: " + JSON.stringify(p.meta.extra_usage));
     if(p.meta.endpoint) metaBits.push("Источник: " + p.meta.endpoint);
     if(p.meta.token_stale) metaBits.push("⚠ токен истёк — открой CLI и залогинься");
   }
@@ -354,9 +385,98 @@ function renderDetail(id){
 function renderAll(){
   renderOverview();
   for(const id of ["claude","codex"]) renderDetail(id);
+  renderSettings();
   if(DATA && DATA.updated_at){
     $("#updated").textContent = "обновлено " + fmtClock(DATA.updated_at);
   }
+}
+
+function renderSettings(){
+  const el = $("#page-settings");
+  if(!DATA || !DATA._config) return;
+  const cfg = DATA._config;
+  
+  // Сохраняем текущие значения полей если они есть
+  const existingRefresh = $("#cfg-refresh")?.value;
+  const existingWidth = $("#cfg-width")?.value;
+  const existingHeight = $("#cfg-height")?.value;
+  const existingOnTop = $("#cfg-ontop")?.checked;
+  
+  // Если поля уже есть и пользователь редактирует — не пересоздаём
+  if(existingRefresh && document.activeElement?.id?.startsWith("cfg-")) return;
+  
+  el.innerHTML = `
+    <div class="settings">
+      <h2>Настройки</h2>
+      <div class="section">
+        <div class="section-title">Общие</div>
+        <div class="field">
+          <label>Интервал обновления (секунды)</label>
+          <input type="number" id="cfg-refresh" value="${cfg.refresh_interval_sec || 60}" min="15" max="600">
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Окно</div>
+        <div class="field">
+          <label>Ширина (px)</label>
+          <input type="number" id="cfg-width" value="${cfg.window?.width || 380}" min="200" max="800">
+        </div>
+        <div class="field">
+          <label>Высота (px)</label>
+          <input type="number" id="cfg-height" value="${cfg.window?.height || 600}" min="300" max="1200">
+        </div>
+        <div class="toggle-row">
+          <label>Поверх всех окон</label>
+          <label class="switch">
+            <input type="checkbox" id="cfg-ontop" ${cfg.window?.on_top ? 'checked' : ''}>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <button class="save-btn" id="btn-save-settings">Сохранить</button>
+      <div class="saved-msg" id="saved-msg" style="display:none">Сохранено!</div>
+    </div>
+  `;
+  
+  $("#btn-save-settings").addEventListener("click", async () => {
+    const newCfg = {
+      refresh_interval_sec: parseInt($("#cfg-refresh").value) || 60,
+      window: {
+        width: parseInt($("#cfg-width").value) || 380,
+        height: parseInt($("#cfg-height").value) || 600,
+        on_top: $("#cfg-ontop").checked,
+      }
+    };
+    const ok = await window.pywebview.api.save_config_api(newCfg);
+    if(ok === true){
+      const msg = $("#saved-msg");
+      msg.style.display = "block";
+      setTimeout(() => msg.style.display = "none", 2000);
+      // Обновляем интервал таймера сразу
+      pullInterval = newCfg.refresh_interval_sec * 1000;
+      lastPullTime = Date.now();
+      // Обновить данные
+      setTimeout(() => pull(true), 500);
+    }
+  });
+  // Toggle on_top из настроек — синхронизируем с кнопкой в хедере
+  $("#cfg-ontop").addEventListener("change", async () => {
+    const v = await window.pywebview.api.toggle_on_top();
+    // Обновляем кнопку в хедере
+    const pinBtn = $("#btn-pin");
+    if(pinBtn) pinBtn.classList.toggle("pin-on", !!v);
+  });
+}
+
+let lastPullTime = 0;
+let pullInterval = 5000;
+let lastUpdatedAt = 0;
+
+function tickCountdown(){
+  if(!lastPullTime) return;
+  const elapsed = Date.now() - lastPullTime;
+  const remaining = Math.max(0, Math.ceil((pullInterval - elapsed) / 1000));
+  $("#countdown").textContent = remaining > 0 ? remaining + "с" : "";
 }
 
 /* ---------- навигация ---------- */
@@ -370,22 +490,34 @@ document.querySelectorAll("nav button").forEach(b =>
   b.addEventListener("click", () => showPage(b.dataset.page)));
 
 /* ---------- связь с бэкендом ---------- */
-async function pull(){
+async function pull(isManual = false){
   if(!window.pywebview || !window.pywebview.api) return;
   try{
     const snap = await window.pywebview.api.get_data();
     if(snap && snap.updated_at){
       clockSkew = snap.now - Date.now()/1000;
       DATA = snap;
+      pullInterval = (snap.refresh_interval_sec || 60) * 1000;
+      // Сбрасываем таймер когда данные действительно обновились или при ручном обновлении
+      if(isManual || snap.updated_at !== lastUpdatedAt){
+        lastPullTime = Date.now();
+        lastUpdatedAt = snap.updated_at;
+      }
       renderAll();
+      // Инициализируем кнопку pin при первом pull
+      if(!isManual && DATA && DATA.on_top !== undefined){
+        const pinBtn = $("#btn-pin");
+        pinBtn.classList.toggle("pin-on", !!DATA.on_top);
+      }
     }
   }catch(e){ /* бэкенд ещё поднимается */ }
 }
 
 window.addEventListener("pywebviewready", () => {
   pull();
-  setInterval(pull, 5000);
+  setInterval(() => pull(false), 5000);
   setInterval(() => { if(DATA) renderAll(); }, 30000);
+  setInterval(tickCountdown, 1000);
   let refreshDebounce = false;
   $("#btn-refresh").addEventListener("click", async () => {
     if(refreshDebounce) return;
@@ -393,8 +525,8 @@ window.addEventListener("pywebviewready", () => {
     $("#btn-refresh").style.opacity = "0.5";
     try {
       await window.pywebview.api.refresh_now();
-      setTimeout(pull, 1500);
-      setTimeout(pull, 4000);
+      setTimeout(() => pull(true), 1500);
+      setTimeout(() => pull(true), 4000);
     } finally {
       setTimeout(() => {
         refreshDebounce = false;
@@ -413,10 +545,14 @@ window.addEventListener("pywebviewready", () => {
     });
   }
   const pinBtn = $("#btn-pin");
-  pinBtn.classList.add("pin-on");
   pinBtn.addEventListener("click", async () => {
     const v = await window.pywebview.api.toggle_on_top();
-    pinBtn.classList.toggle("pin-on", !!v);
+    if(v !== null){
+      pinBtn.classList.toggle("pin-on", v);
+      // Синхронизируем toggle в настройках
+      const cfgOnTop = $("#cfg-ontop");
+      if(cfgOnTop) cfgOnTop.checked = !!v;
+    }
   });
   setInterval(async () => {
     if(DATA) {

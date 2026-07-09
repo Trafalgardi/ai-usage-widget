@@ -682,6 +682,11 @@ class JsApi:
         snap["now"] = time.time()
         snap["refresh_interval_sec"] = CFG.get("refresh_interval_sec", 60)
         snap["token_status"] = self.get_token_status()
+        try:
+            snap["on_top"] = CFG["window"].get("on_top", True)
+        except Exception:
+            snap["on_top"] = True
+        snap["_config"] = copy.deepcopy(CFG)
         return snap
 
     def get_token_status(self):
@@ -833,15 +838,41 @@ class JsApi:
         return result
 
     def toggle_on_top(self):
+        new_val = not CFG["window"].get("on_top", True)
+        def _do():
+            try:
+                win = webview.windows[0]
+                win.on_top = new_val
+                CFG["window"]["on_top"] = new_val
+                save_config(CFG)
+            except Exception:
+                pass
+        threading.Thread(target=_do, daemon=True).start()
+        return new_val
+
+    def get_config(self):
+        return copy.deepcopy(CFG)
+
+    def save_config_api(self, cfg):
+        global CFG
         try:
-            win = webview.windows[0]
-            new_val = not CFG["window"].get("on_top", True)
-            win.on_top = new_val
-            CFG["window"]["on_top"] = new_val
+            for k, v in cfg.items():
+                if isinstance(v, dict) and isinstance(CFG.get(k), dict):
+                    CFG[k].update(v)
+                else:
+                    CFG[k] = v
             save_config(CFG)
-            return new_val
-        except Exception:
-            return None
+            # Применить настройки окна
+            try:
+                win = webview.windows[0]
+                w = CFG["window"]
+                win.on_top = w.get("on_top", True)
+                win.resize(w.get("width", 380), w.get("height", 600))
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            return str(e)
 
     def close(self):
         STATE.shutdown_event.set()
