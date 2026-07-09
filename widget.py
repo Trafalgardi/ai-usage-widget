@@ -512,7 +512,13 @@ class TrayManager:
 
     def _create_icon_image(self, text="", color="#FFFFFF", outline=None, bg_color=None):
         size = 64
-        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        # Загружаем базовую иконку
+        icon_path = os.path.join(APP_DIR, "icon", "512.png")
+        if os.path.exists(icon_path):
+            img = Image.open(icon_path).resize((size, size), Image.LANCZOS).convert("RGBA")
+        else:
+            img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        
         draw = ImageDraw.Draw(img)
         
         try:
@@ -911,6 +917,7 @@ def main():
     threading.Thread(target=refresh_loop, daemon=True).start()
 
     w = CFG["window"]
+    icon_path = os.path.join(APP_DIR, "icon", "app.ico")
     window = webview.create_window(
         "AI Usage",
         url=os.path.join(APP_DIR, "ui.html"),
@@ -924,6 +931,7 @@ def main():
         on_top=w.get("on_top", True),
         resizable=True,
         background_color="#101012",
+        icon=icon_path if os.path.exists(icon_path) else None,
     )
     if TRAY_AVAILABLE:
         TRAY.start(window)
