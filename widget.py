@@ -917,7 +917,6 @@ def main():
     threading.Thread(target=refresh_loop, daemon=True).start()
 
     w = CFG["window"]
-    icon_path = os.path.join(APP_DIR, "icon", "app.ico")
     window = webview.create_window(
         "AI Usage",
         url=os.path.join(APP_DIR, "ui.html"),
@@ -931,8 +930,18 @@ def main():
         on_top=w.get("on_top", True),
         resizable=True,
         background_color="#101012",
-        icon=icon_path if os.path.exists(icon_path) else None,
     )
+    # Устанавливаем иконку окна после создания
+    icon_path = os.path.join(APP_DIR, "icon", "app.ico")
+    if os.path.exists(icon_path):
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ai.usage.widget")
+            hwnd = window.native
+            if hwnd:
+                ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, icon_path)  # WM_SETICON
+        except Exception:
+            pass
     if TRAY_AVAILABLE:
         TRAY.start(window)
     webview.start(debug=False)
