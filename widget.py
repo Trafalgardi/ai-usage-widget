@@ -512,13 +512,7 @@ class TrayManager:
 
     def _create_icon_image(self, text="", color="#FFFFFF", outline=None, bg_color=None):
         size = 64
-        # Загружаем базовую иконку
-        icon_path = os.path.join(APP_DIR, "icon", "512.png")
-        if os.path.exists(icon_path):
-            img = Image.open(icon_path).resize((size, size), Image.LANCZOS).convert("RGBA")
-        else:
-            img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         
         try:
@@ -931,15 +925,18 @@ def main():
         resizable=True,
         background_color="#101012",
     )
-    # Устанавливаем иконку окна после создания
+    # Устанавливаем иконку окна через ctypes
     icon_path = os.path.join(APP_DIR, "icon", "app.ico")
     if os.path.exists(icon_path):
         try:
             import ctypes
+            from ctypes import wintypes
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ai.usage.widget")
             hwnd = window.native
             if hwnd:
-                ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, icon_path)  # WM_SETICON
+                icon = ctypes.windll.user32.LoadImageW(None, icon_path, 1, 0, 0, 0x00000010 | 0x00000020)
+                if icon:
+                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, icon)  # WM_SETICON
         except Exception:
             pass
     if TRAY_AVAILABLE:

@@ -183,6 +183,23 @@
   .settings .save-btn:hover{background:#c96747}
   .settings .save-btn:disabled{opacity:.6; cursor:not-allowed}
   .settings .saved-msg{font-size:11px; color:#2ECC40; margin-top:8px; text-align:center}
+  
+  /* ---------- загрузка ---------- */
+  .loading-overlay{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:12px; z-index:100;
+    background:var(--shell);
+  }
+  .loading-overlay.hidden{display:none}
+  .loading-spinner{
+    width:32px; height:32px;
+    border:3px solid #2a2a2e; border-top-color:#d97757;
+    border-radius:50%; animation:spin 1s linear infinite;
+  }
+  .loading-text{font-size:11px; color:#5c5c64; letter-spacing:.05em}
+  
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion: reduce){ .bar i{transition:none} }
 </style>
 </head>
@@ -199,7 +216,12 @@
   </header>
 
   <div id="pages">
-    <div class="page active" id="page-overview"></div>
+    <div class="page active" id="page-overview">
+      <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Загрузка данных…</div>
+      </div>
+    </div>
     <div class="page" id="page-claude"></div>
     <div class="page" id="page-codex"></div>
     <div class="page" id="page-settings"></div>
@@ -388,6 +410,9 @@ function renderAll(){
   renderSettings();
   if(DATA && DATA.updated_at){
     $("#updated").textContent = "обновлено " + fmtClock(DATA.updated_at);
+    // Скрываем оверлей загрузки
+    const loading = $("#loading");
+    if(loading) loading.classList.add("hidden");
   }
 }
 
