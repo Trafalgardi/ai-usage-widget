@@ -545,21 +545,70 @@ class TrayManager:
 
     def _update_icon_with_data(self):
         pcts = self._get_session_pcts()
-        claude_pct = pcts.get("claude")
-        codex_pct = pcts.get("codex")
-        claude_text = f"{int(claude_pct):02d}" if claude_pct is not None else "--"
-        codex_text = f"{int(codex_pct):02d}" if codex_pct is not None else "--"
-        try:
-            if self.icon_claude:
-                img_claude = self._create_icon_image(claude_text, color="#D97757")
-                self.icon_claude.icon = img_claude
-            if self.icon_codex:
-                img_codex = self._create_icon_image(codex_text, color="#2ECC40", outline="#1a7a25")
-                self.icon_codex.icon = img_codex
-        except Exception as e:
-            print(f"Tray: icon update error: {e}")
+        providers = {"claude": "Claude Code", "codex": "Codex CLI"}
+        icon_attrs = {"claude": "icon_claude", "codex": "icon_codex"}
+        thread_attrs = {"claude": "_thread_claude", "codex": "_thread_codex"}
+        
+        for pid, pname in providers.items():
+            pct = pcts.get(pid)
+            has_data = pct is not None
+            icon = getattr(self, icon_attrs[pid], None)
+            
+            if has_data:
+                text = f"{int(pct):02d}"
+                if pid == "claude":
+                    img = self._create_icon_image(text, color="#D97757")
+                else:
+                    img = self._create_icon_image(text, color="#2ECC40", outline="#1a7a25")
+                if icon:
+                    # Обновляем существующую иконку
+                    try:
+                        icon.icon = img
+                        icon.title = self._build_tooltip()
+                    except Exception:
+                        pass
+                else:
+                    # Создаём новую иконку
+                    self._create_tray_icon(pid, pname, img)
+            else:
+                if icon:
+                    # Останавливаем и прячем иконку
+                    try:
+                        icon.stop()
+                    except Exception:
+                        pass
+                    setattr(self, icon_attrs[pid], None)
+                    setattr(self, thread_attrs[pid], None)
 
-    def _build_tooltip(self):
+    def _create_tray_icon(self, pid, pname, img):
+        lang = (CFG.get("language") or "ru")[:2]
+        labels = {
+            "show": "Show" if lang == "en" else "Показать",
+            "refresh": "Refresh" if lang == "en" else "Обновить",
+            "exit": "Exit" if lang == "en" else "Выход",
+        }
+        menu = pystray.Menu(
+            pystray.MenuItem(labels["show"], self._on_show, default=True),
+            pystray.MenuItem(labels["refresh"], self._on_refresh),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(labels["exit"], self._on_quit),
+        )
+        name = f"ai-usage-{pid}"
+        title = pname
+        icon = pystray.Icon(name, img, title, menu)
+        t = threading.Thread(target=icon.run, daemon=True)
+        t.start()
+        if pid == "claude":
+            self.icon_claude = icon
+            self._thread_claude = t
+        else:
+            self.icon_codex = icon
+            self._thread_codex = t
+
+    def start(self, window):
+        if not TRAY_AVAILABLE:
+            return
+        self.window_ref = window
         with STATE.lock:
             snap = copy.deepcopy(STATE.snapshot)
         if not snap.get("updated_at"):
@@ -608,26 +657,6 @@ class TrayManager:
         if not TRAY_AVAILABLE:
             return
         self.window_ref = window
-        lang = (CFG.get("language") or "ru")[:2]
-        labels = {
-            "show": "Show" if lang == "en" else "Показать",
-            "refresh": "Refresh" if lang == "en" else "Обновить",
-            "exit": "Exit" if lang == "en" else "Выход",
-        }
-        menu = pystray.Menu(
-            pystray.MenuItem(labels["show"], self._on_show, default=True),
-            pystray.MenuItem(labels["refresh"], self._on_refresh),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem(labels["exit"], self._on_quit),
-        )
-        img_claude = self._create_icon_image("--", color="#D97757")
-        img_codex = self._create_icon_image("--", color="#2ECC40", outline="#1a7a25")
-        self.icon_claude = pystray.Icon("ai-usage-claude", img_claude, "Claude Code", menu)
-        self.icon_codex = pystray.Icon("ai-usage-codex", img_codex, "Codex CLI", menu)
-        self._thread_claude = threading.Thread(target=self.icon_claude.run, daemon=True)
-        self._thread_codex = threading.Thread(target=self.icon_codex.run, daemon=True)
-        self._thread_claude.start()
-        self._thread_codex.start()
 
     def update_tooltip(self):
         tooltip = self._build_tooltip()
