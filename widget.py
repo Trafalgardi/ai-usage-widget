@@ -580,8 +580,12 @@ class TrayManager:
                 secs = max(0, int(resets - time.time()))
                 h, rem = divmod(secs, 3600)
                 m = rem // 60
-                reset_str = f"{h}ч {m}м" if h > 0 else f"{m}м"
-                lines.append(f"{pname}: {pct}% (сброс {reset_str})")
+                lang = (CFG.get("language") or "ru")[:2]
+                hu = "h" if lang == "en" else "ч"
+                mu = "m" if lang == "en" else "м"
+                reset_label = "resets in" if lang == "en" else "сброс"
+                reset_str = f"{h}{hu} {m}{mu}" if h > 0 else f"{m}{mu}"
+                lines.append(f"{pname}: {pct}% ({reset_label} {reset_str})")
             else:
                 lines.append(f"{pname}: {pct}%")
         return "\n".join(lines)
@@ -604,11 +608,17 @@ class TrayManager:
         if not TRAY_AVAILABLE:
             return
         self.window_ref = window
+        lang = (CFG.get("language") or "ru")[:2]
+        labels = {
+            "show": "Show" if lang == "en" else "Показать",
+            "refresh": "Refresh" if lang == "en" else "Обновить",
+            "exit": "Exit" if lang == "en" else "Выход",
+        }
         menu = pystray.Menu(
-            pystray.MenuItem("Показать", self._on_show, default=True),
-            pystray.MenuItem("Обновить", self._on_refresh),
+            pystray.MenuItem(labels["show"], self._on_show, default=True),
+            pystray.MenuItem(labels["refresh"], self._on_refresh),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Выход", self._on_quit),
+            pystray.MenuItem(labels["exit"], self._on_quit),
         )
         img_claude = self._create_icon_image("--", color="#D97757")
         img_codex = self._create_icon_image("--", color="#2ECC40", outline="#1a7a25")
@@ -856,6 +866,7 @@ class JsApi:
     def save_config_api(self, cfg):
         global CFG
         try:
+            old_lang = CFG.get("language", "ru")
             for k, v in cfg.items():
                 if isinstance(v, dict) and isinstance(CFG.get(k), dict):
                     CFG[k].update(v)
@@ -870,6 +881,9 @@ class JsApi:
                 win.resize(w.get("width", 380), w.get("height", 600))
             except Exception:
                 pass
+            # Обновить трей при смене языка
+            if CFG.get("language", "ru") != old_lang:
+                TRAY.update_tooltip()
             return True
         except Exception as e:
             return str(e)

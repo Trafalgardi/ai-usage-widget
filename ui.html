@@ -209,17 +209,17 @@
     <span class="title">AI&nbsp;Usage</span>
     <span class="updated" id="updated">…</span>
     <span class="countdown" id="countdown"></span>
-    <button id="btn-refresh" title="Обновить">⟳</button>
-    <button id="btn-pin" title="Поверх окон">◉</button>
-    <button id="btn-tray" title="В трей">⎯</button>
-    <button id="btn-close" title="Закрыть">✕</button>
+    <button id="btn-refresh" title="">⟳</button>
+    <button id="btn-pin" title="">◉</button>
+    <button id="btn-tray" title="">⎯</button>
+    <button id="btn-close" title="">✕</button>
   </header>
 
   <div id="pages">
     <div class="page active" id="page-overview">
       <div class="loading-overlay" id="loading">
         <div class="loading-spinner"></div>
-        <div class="loading-text">Загрузка данных…</div>
+        <div class="loading-text" id="loading-text">Загрузка данных…</div>
       </div>
     </div>
     <div class="page" id="page-claude"></div>
@@ -228,17 +228,195 @@
   </div>
 
   <nav>
-    <button data-page="overview" class="active">Обзор</button>
+    <button data-page="overview" class="active" id="nav-overview">Обзор</button>
     <button data-page="claude" class="n-claude">Claude</button>
     <button data-page="codex" class="n-codex">Codex</button>
-    <button data-page="settings">Настройки</button>
+    <button data-page="settings" id="nav-settings">Настройки</button>
   </nav>
 </div>
 
 <script>
 "use strict";
-let DATA = null;           // последний снимок от бэкенда
-let clockSkew = 0;         // now(сервер) - now(клиент)
+let DATA = null;
+let clockSkew = 0;
+let LANG = "ru";
+
+const L10N = {
+  ru: {
+    loading: "Загрузка…",
+    updated: "обновлено",
+    overview: "Обзор",
+    settings: "Настройки",
+    session: "Сессия (5 ч)",
+    week: "Неделя",
+    weekOpus: "Неделя · Opus",
+    weekSonnet: "Неделя · Sonnet",
+    weekApps: "Неделя · приложения",
+    subscription: "подписка",
+    resetsIn: "сброс через",
+    remaining: "остаток",
+    noData: "нет данных",
+    tokenActive: "Активен",
+    tokenExpiring: "Истекает",
+    tokenExpired: "Истёк",
+    loginBtn: "Войти через CLI",
+    starting: "Запуск…",
+    opened: "Открыто в новом окне",
+    error: "Ошибка",
+    refresh: "Обновить",
+    refreshTitle: "Обновить",
+    pinTitle: "Поверх окон",
+    trayTitle: "В трей",
+    closeTitle: "Закрыть",
+    loadingData: "Загрузка данных…",
+    refreshInterval: "Интервал обновления (секунды)",
+    width: "Ширина (px)",
+    height: "Высота (px)",
+    onTop: "Поверх всех окон",
+    save: "Сохранить",
+    saved: "Сохранено!",
+    general: "Общие",
+    winSection: "Окно",
+    credits: "Кредиты",
+    balance: "Баланс",
+    source: "Источник",
+    tokenStale: "⚠ токен истёк — открой CLI и залогинься",
+    d: "д",
+    h: "ч",
+    m: "м",
+    sec: "с",
+    days: "д",
+    hours: "ч",
+    mins: "м",
+    dol: " за",
+    of: " из",
+    language: "Язык / Language",
+    // перевод label'ов окон из widget.py
+    "Сессия (5 ч)": "Сессия (5 ч)",
+    "Неделя": "Неделя",
+    "Неделя · Opus": "Неделя · Opus",
+    "Неделя · Sonnet": "Неделя · Sonnet",
+    "Неделя · приложения": "Неделя · приложения",
+    "Месяц": "Месяц",
+    // перевод ошибок из widget.py
+    "Внутренняя ошибка:\n": "Внутренняя ошибка:\n",
+    "Не найден токен Claude Code": "Не найден токен Claude Code",
+    "Не найден ~/.codex/auth.json": "Не найден ~/.codex/auth.json",
+    "Не удалось прочитать auth.json": "Не удалось прочитать auth.json",
+    "В auth.json нет access_token": "В auth.json нет access_token",
+    "API ответил, но формат не распознан": "API ответил, но формат не распознан",
+    "API ответил, но лимиты не найдены": "API ответил, но лимиты не найдены",
+    "Нет ответа от API": "Нет ответа от API",
+    "Не удалось прочитать": "Не удалось прочитать",
+    "Авторизация запущена": "Авторизация запущена",
+    "Claude CLI не найден": "Claude CLI не найден",
+    "Codex CLI не найден": "Codex CLI не найден",
+    "Ошибка:": "Ошибка:",
+    "Доп. лимит": "Доп. лимит",
+  },
+  en: {
+    loading: "Loading…",
+    updated: "updated",
+    overview: "Overview",
+    settings: "Settings",
+    session: "Session (5h)",
+    week: "Week",
+    weekOpus: "Week · Opus",
+    weekSonnet: "Week · Sonnet",
+    weekApps: "Week · apps",
+    subscription: "subscription",
+    resetsIn: "resets in",
+    remaining: "remaining",
+    noData: "no data",
+    tokenActive: "Active",
+    tokenExpiring: "Expiring",
+    tokenExpired: "Expired",
+    loginBtn: "Login via CLI",
+    starting: "Starting…",
+    opened: "Opened in new window",
+    error: "Error",
+    refresh: "Refresh",
+    refreshTitle: "Refresh",
+    pinTitle: "Always on top",
+    trayTitle: "Minimize to tray",
+    closeTitle: "Close",
+    loadingData: "Loading data…",
+    refreshInterval: "Refresh interval (seconds)",
+    width: "Width (px)",
+    height: "Height (px)",
+    onTop: "Always on top",
+    save: "Save",
+    saved: "Saved!",
+    general: "General",
+    winSection: "Window",
+    credits: "Credits",
+    balance: "Balance",
+    source: "Source",
+    tokenStale: "⚠ token expired — open CLI and login",
+    d: "d",
+    h: "h",
+    m: "m",
+    sec: "s",
+    days: "d",
+    hours: "h",
+    mins: "m",
+    of: " of ",
+    language: "Language",
+    // перевод label'ов окон из widget.py
+    "Сессия (5 ч)": "Session (5h)",
+    "Неделя": "Week",
+    "Неделя · Opus": "Week · Opus",
+    "Неделя · Sonnet": "Week · Sonnet",
+    "Неделя · приложения": "Week · apps",
+    "Месяц": "Month",
+    // перевод ошибок из widget.py
+    "Внутренняя ошибка:\n": "Internal error:\n",
+    "Не найден токен Claude Code": "Claude Code token not found",
+    "Не найден ~/.codex/auth.json": "Codex auth.json not found",
+    "Не удалось прочитать auth.json": "Failed to read auth.json",
+    "В auth.json нет access_token": "No access_token in auth.json",
+    "API ответил, но формат не распознан": "API responded, format not recognized",
+    "API ответил, но лимиты не найдены": "API responded, limits not found",
+    "Нет ответа от API": "No response from API",
+    "Не удалось прочитать": "Failed to read",
+    "Авторизация запущена": "Authorization started",
+    "Claude CLI не найден": "Claude CLI not found",
+    "Codex CLI не найден": "Codex CLI not found",
+    "Ошибка:": "Error:",
+    "Доп. лимит": "Extra limit",
+  },
+};
+
+function t(key){ return L10N[LANG]?.[key] || L10N["ru"][key] || key; }
+
+// Перевод ошибок и динамических строк: точное совпадение → перевод, иначе как есть
+function terr(msg){
+  if(!msg) return "";
+  // Полное совпадение
+  const fullTr = t(msg);
+  if(fullTr !== msg) return fullTr;
+  // Первая строка (для внутренних ошибок с трейсом)
+  const firstLine = msg.split("\n")[0];
+  const lineTr = t(firstLine);
+  if(lineTr !== firstLine) return lineTr + (msg.includes("\n") ? msg.substring(msg.indexOf("\n")) : "");
+  // "Доп. лимит N" → переводим префикс
+  if(msg.startsWith("Доп. лимит ")){
+    return t("Доп. лимит") + " " + msg.split(" ").slice(2).join(" ");
+  }
+  return msg;
+}
+
+function updateTitles(){
+  const btn = id => document.getElementById(id);
+  if(btn("btn-refresh")) btn("btn-refresh").title = t("refreshTitle");
+  if(btn("btn-pin")) btn("btn-pin").title = t("pinTitle");
+  if(btn("btn-tray")) btn("btn-tray").title = t("trayTitle");
+  if(btn("btn-close")) btn("btn-close").title = t("closeTitle");
+  const lt = btn("loading-text");
+  if(lt) lt.textContent = t("loadingData");
+  if(btn("nav-overview")) btn("nav-overview").textContent = t("overview");
+  if(btn("nav-settings")) btn("nav-settings").textContent = t("settings");
+}
 
 const GLYPH = { claude:"✳", codex:"⬡", opencode:"█" };
 const THEME = { claude:"th-claude", codex:"th-codex", opencode:"th-opencode" };
@@ -254,9 +432,9 @@ function fmtCountdown(epoch){
   const d = Math.floor(s/86400); s -= d*86400;
   const h = Math.floor(s/3600);  s -= h*3600;
   const m = Math.floor(s/60);
-  if(d > 0) return `${d} д ${h} ч`;
-  if(h > 0) return `${h} ч ${m} м`;
-  return `${m} м`;
+  if(d > 0) return `${d} ${t("d")} ${h} ${t("h")}`;
+  if(h > 0) return `${h} ${t("h")} ${m} ${t("m")}`;
+  return `${m} ${t("m")}`;
 }
 function fmtClock(epoch){
   if(!epoch) return "";
@@ -268,7 +446,7 @@ function fmtClock(epoch){
 }
 function pctText(w){
   if(w.remaining_pct == null) return "—";
-  return (Math.round(w.remaining_pct*10)/10).toLocaleString("ru-RU");
+  return (Math.round(w.remaining_pct*10)/10).toLocaleString(LANG === "en" ? "en-US" : "ru-RU");
 }
 function asciiBar(pctRemaining, width=18){
   if(pctRemaining == null) return "";
@@ -282,7 +460,7 @@ function sessionWin(p){
 /* ---------- обзор ---------- */
 function renderOverview(){
   const el = $("#page-overview");
-  if(!DATA){ el.innerHTML = "<div class='empty'>Загрузка…</div>"; return; }
+  if(!DATA){ el.innerHTML = `<div class='empty'>${t("loading")}</div>`; return; }
   let html = "";
   for(const id of ["claude","codex"]){
     const p = DATA.providers[id] || {};
@@ -297,8 +475,8 @@ function renderOverview(){
       </div>`;
     if(w){
       html += `<div class="sub">
-          <span>${esc(w.label)} · остаток</span>
-          <span>${w.resets_at ? "сброс через " + fmtCountdown(w.resets_at) : ""}</span>
+          <span>${esc(t(w.label))} · ${t("remaining")}</span>
+          <span>${w.resets_at ? t("resetsIn") + " " + fmtCountdown(w.resets_at) : ""}</span>
         </div>`;
       if(id === "opencode"){
         html += `<div class="bar ${low}"><div class="asciibar ${low}">${asciiBar(w.remaining_pct)}</div></div>`;
@@ -306,7 +484,7 @@ function renderOverview(){
         html += `<div class="bar ${low}"><i style="width:${w.remaining_pct ?? 0}%"></i></div>`;
       }
     } else {
-      html += `<div class="err">${esc(p.error || "нет данных")}</div>`;
+      html += `<div class="err">${esc(terr(p.error) || t("noData"))}</div>`;
     }
     html += `</div>`;
   }
@@ -319,26 +497,26 @@ function renderOverview(){
 function renderDetail(id){
   const el = $("#page-" + id);
   const p = DATA && DATA.providers[id];
-  if(!p){ el.innerHTML = "<div class='empty'>Загрузка…</div>"; return; }
+  if(!p){ el.innerHTML = `<div class='empty'>${t("loading")}</div>`; return; }
 
   // Статус токена
   const tokenStatus = DATA && DATA.token_status && DATA.token_status[id];
   let statusHtml = "";
   if(tokenStatus){
-    const labels = {valid: "Активен", expiring: "Истекает", expired: "Истёк"};
+    const labels = {valid: t("tokenActive"), expiring: t("tokenExpiring"), expired: t("tokenExpired")};
     statusHtml = `<span class="token-status ${tokenStatus.status}"><span class="dot"></span>${labels[tokenStatus.status]}</span>`;
   }
 
   let html = `<div class="detail ${THEME[id]}">
     <div class="brand"><span class="glyph">${GLYPH[id]}</span><h1>${esc(p.name)}</h1>${statusHtml}</div>
-    <div class="plan">${esc(p.meta && (p.meta.plan || p.meta.subscription) || "подписка")}</div>`;
+    <div class="plan">${esc(p.meta && (p.meta.plan || p.meta.subscription) || t("subscription"))}</div>`;
 
   for(const w of (p.windows || [])){
     const low = w.remaining_pct != null && w.remaining_pct <= 15 ? "low" : "";
     html += `<div class="win">
       <div class="head">
-        <span class="label">${esc(w.label)}</span>
-        <span class="bigpct ${id==='opencode'&&low?'low':''}">${pctText(w)}<small> % остаток</small></span>
+        <span class="label">${esc(t(w.label))}</span>
+        <span class="bigpct ${id==='opencode'&&low?'low':''}">${pctText(w)}<small> % ${t("remaining")}</small></span>
       </div>`;
     if(id === "opencode"){
       html += `<div class="bar"><div class="asciibar ${low}">${asciiBar(w.remaining_pct, 24)}</div></div>`;
@@ -346,30 +524,30 @@ function renderDetail(id){
       html += `<div class="bar ${low}"><i style="width:${w.remaining_pct ?? 0}%"></i></div>`;
     }
     if(w.used_usd != null && w.limit_usd != null){
-      html += `<div class="usd">$${(+w.used_usd).toFixed(2)} из $${(+w.limit_usd).toFixed(2)}</div>`;
+      html += `<div class="usd">$${(+w.used_usd).toFixed(2)}${t("of")}$${(+w.limit_usd).toFixed(2)}</div>`;
     }
     if(w.resets_at){
       html += `<div class="reset" data-reset="${w.resets_at}">
-        <span>сброс через ${fmtCountdown(w.resets_at)}</span>
+        <span>${t("resetsIn")} ${fmtCountdown(w.resets_at)}</span>
         <span>${fmtClock(w.resets_at)}</span></div>`;
     }
     html += `</div>`;
   }
 
   if(!p.ok && p.error){
-    html += `<div class="error">${esc(p.error)}</div>`;
+    html += `<div class="error">${esc(terr(p.error))}</div>`;
     if(id === "claude" || id === "codex"){
-      html += `<button class="login-btn" data-provider="${id}">Войти через CLI</button>`;
+      html += `<button class="login-btn" data-provider="${id}">${t("loginBtn")}</button>`;
     }
   }
 
   // мета-инфо
   const metaBits = [];
   if(p.meta){
-    if(p.meta.credits != null) metaBits.push("Кредиты: " + p.meta.credits);
-    if(p.meta.balance_usd != null) metaBits.push("Баланс: $" + (+p.meta.balance_usd).toFixed(2));
-    if(p.meta.endpoint) metaBits.push("Источник: " + p.meta.endpoint);
-    if(p.meta.token_stale) metaBits.push("⚠ токен истёк — открой CLI и залогинься");
+    if(p.meta.credits != null) metaBits.push(t("credits") + ": " + p.meta.credits);
+    if(p.meta.balance_usd != null) metaBits.push(t("balance") + ": $" + (+p.meta.balance_usd).toFixed(2));
+    if(p.meta.endpoint) metaBits.push(t("source") + ": " + p.meta.endpoint);
+    if(p.meta.token_stale) metaBits.push(t("tokenStale"));
   }
   if(metaBits.length){
     html += `<div class="meta">${metaBits.map(esc).join("<br>")}</div>`;
@@ -381,7 +559,7 @@ function renderDetail(id){
     btn.addEventListener("click", async () => {
       const provider = btn.dataset.provider;
       btn.disabled = true;
-      btn.textContent = "Запуск…";
+      btn.textContent = t("starting");
       
       try {
         const result = provider === "claude" 
@@ -389,15 +567,15 @@ function renderDetail(id){
           : await window.pywebview.api.login_codex();
         
         if(result.success){
-          btn.textContent = "Открыто в новом окне";
+          btn.textContent = terr(result.output);
           // Автообновление через 30 сек
           setTimeout(() => window.pywebview.api.refresh_now(), 30000);
         } else {
-          btn.textContent = "Ошибка";
+          btn.textContent = terr(result.output) || t("error");
           btn.disabled = false;
         }
       } catch(e){
-        btn.textContent = "Ошибка";
+        btn.textContent = t("error");
         btn.disabled = false;
       }
     });
@@ -409,7 +587,7 @@ function renderAll(){
   for(const id of ["claude","codex"]) renderDetail(id);
   renderSettings();
   if(DATA && DATA.updated_at){
-    $("#updated").textContent = "обновлено " + fmtClock(DATA.updated_at);
+    $("#updated").textContent = t("updated") + " " + fmtClock(DATA.updated_at);
     // Скрываем оверлей загрузки
     const loading = $("#loading");
     if(loading) loading.classList.add("hidden");
@@ -432,39 +610,48 @@ function renderSettings(){
   
   el.innerHTML = `
     <div class="settings">
-      <h2>Настройки</h2>
+      <h2>${t("settings")}</h2>
       <div class="section">
-        <div class="section-title">Общие</div>
+        <div class="section-title">${t("general")}</div>
         <div class="field">
-          <label>Интервал обновления (секунды)</label>
+          <label>${t("refreshInterval")}</label>
           <input type="number" id="cfg-refresh" value="${cfg.refresh_interval_sec || 60}" min="15" max="600">
+        </div>
+        <div class="field">
+          <label>${t("language")}</label>
+          <select id="cfg-lang" style="width:100%; padding:8px 10px; background:#1a1a1e; border:1px solid #2a2a2e; border-radius:6px; color:#ececf1; font-size:12px; box-sizing:border-box;">
+            <option value="ru" ${(cfg.language || 'ru') === 'ru' ? 'selected' : ''}>Русский</option>
+            <option value="en" ${cfg.language === 'en' ? 'selected' : ''}>English</option>
+          </select>
         </div>
       </div>
       <div class="section">
-        <div class="section-title">Окно</div>
+        <div class="section-title">${t("winSection")}</div>
         <div class="field">
-          <label>Ширина (px)</label>
+          <label>${t("width")}</label>
           <input type="number" id="cfg-width" value="${cfg.window?.width || 380}" min="200" max="800">
         </div>
         <div class="field">
-          <label>Высота (px)</label>
+          <label>${t("height")}</label>
           <input type="number" id="cfg-height" value="${cfg.window?.height || 600}" min="300" max="1200">
         </div>
         <div class="toggle-row">
-          <label>Поверх всех окон</label>
+          <label>${t("onTop")}</label>
           <label class="switch">
             <input type="checkbox" id="cfg-ontop" ${cfg.window?.on_top ? 'checked' : ''}>
             <span class="slider"></span>
           </label>
         </div>
       </div>
-      <button class="save-btn" id="btn-save-settings">Сохранить</button>
-      <div class="saved-msg" id="saved-msg" style="display:none">Сохранено!</div>
+      <button class="save-btn" id="btn-save-settings">${t("save")}</button>
+      <div class="saved-msg" id="saved-msg" style="display:none">${t("saved")}</div>
     </div>
   `;
   
   $("#btn-save-settings").addEventListener("click", async () => {
+    const lang = $("#cfg-lang")?.value || LANG;
     const newCfg = {
+      language: lang,
       refresh_interval_sec: parseInt($("#cfg-refresh").value) || 60,
       window: {
         width: parseInt($("#cfg-width").value) || 380,
@@ -477,10 +664,13 @@ function renderSettings(){
       const msg = $("#saved-msg");
       msg.style.display = "block";
       setTimeout(() => msg.style.display = "none", 2000);
-      // Обновляем интервал таймера сразу
+      // Применяем язык сразу, не ждём pull
+      if(lang !== LANG){
+        LANG = lang;
+        updateTitles();
+      }
       pullInterval = newCfg.refresh_interval_sec * 1000;
       lastPullTime = Date.now();
-      // Обновить данные
       setTimeout(() => pull(true), 500);
     }
   });
@@ -501,7 +691,7 @@ function tickCountdown(){
   if(!lastPullTime) return;
   const elapsed = Date.now() - lastPullTime;
   const remaining = Math.max(0, Math.ceil((pullInterval - elapsed) / 1000));
-  $("#countdown").textContent = remaining > 0 ? remaining + "с" : "";
+  $("#countdown").textContent = remaining > 0 ? remaining + t("sec") : "";
 }
 
 /* ---------- навигация ---------- */
@@ -523,6 +713,12 @@ async function pull(isManual = false){
       clockSkew = snap.now - Date.now()/1000;
       DATA = snap;
       pullInterval = (snap.refresh_interval_sec || 60) * 1000;
+      // Синхронизируем язык из конфига
+      const oldLang = LANG;
+      if(!LANG || (DATA._config && DATA._config.language && DATA._config.language !== LANG)){
+        LANG = (DATA._config && DATA._config.language) || "ru";
+      }
+      if(oldLang !== LANG) updateTitles();
       // Сбрасываем таймер когда данные действительно обновились или при ручном обновлении
       if(isManual || snap.updated_at !== lastUpdatedAt){
         lastPullTime = Date.now();
@@ -543,6 +739,7 @@ window.addEventListener("pywebviewready", () => {
   setInterval(() => pull(false), 5000);
   setInterval(() => { if(DATA) renderAll(); }, 30000);
   setInterval(tickCountdown, 1000);
+  updateTitles();
   let refreshDebounce = false;
   $("#btn-refresh").addEventListener("click", async () => {
     if(refreshDebounce) return;
