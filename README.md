@@ -1,110 +1,111 @@
-# AI Usage Widget — виджет лимитов для Windows 11
+# AI Usage Widget — limit tracker for Windows 11
 
-Небольшое всегда-поверх-окон окошко, которое показывает **остатки лимитов** для
-Claude Code и Codex CLI в реальном времени.
+A lightweight always-on-top widget that shows **usage limits** for
+Claude Code and Codex CLI in real time.
 
-![Обзор](preview/shot_overview.png)
+![Overview](preview/shot_overview.png)
 
-## Возможности
+## Features
 
-### Основные экраны
-1. **Обзор** — остаток текущей 5-часовой сессии по обоим сервисам с таймером сброса
-2. **Claude** — сессия + неделя (и Opus-неделя, если есть) со временем сброса
-3. **Codex** — сессия + неделя со временем сброса, план, доп. лимиты моделей
-4. **Настройки** — интервал обновления, размер окна, режим "поверх всех окон"
+### Screens
+1. **Overview** — current 5-hour session remaining for both services with reset timer
+2. **Claude** — session + weekly (and Opus weekly if available) with reset countdown
+3. **Codex** — session + weekly with reset countdown, plan, additional model limits
+4. **Settings** — refresh interval, window size, always-on-top mode
 
-### Индикаторы статуса
-- **Статус токена** — цветной бейдж рядом с названием сервиса:
-  -  Активен — токен валиден
-  -  Истекает — осталось меньше часа
-  -  Истёк — нужно залогиниться
-- **Таймер обратного отсчёта** — показывает секунды до следующего обновления
-- **Красная полоска** — остаток ≤ 15%
+### Status Indicators
+- **Token status** — colored badge next to service name:
+  -  Active — token is valid
+  -  Expiring — less than 1 hour remaining
+  -  Expired — login required
+- **Countdown timer** — shows seconds until next refresh
+- **Red bar** — usage ≥ 85%
 
-### Системный трей
-При сворачивании в трей виджет продолжает работать в фоне. В трее появляются две иконки с процентами:
-- **Оранжевые цифры** — Claude Code
-- **Зелёные цифры** — Codex CLI
+### System Tray
+Minimize to tray and the widget keeps working in the background. Two tray icons with percentages:
+- **Orange digits** — Claude Code
+- **Green digits** — Codex CLI
 
-![Трей](preview/shot_tray.png)
+Hover over an icon for detailed tooltip. Right-click:
+- **Show** — restore window
+- **Refresh** — fetch fresh data
+- **Exit** — close widget completely
 
-Наведи на иконку — увидишь тултип с подробной информацией. Правый клик:
-- **Показать** — вернуть окно
-- **Обновить** — запросить свежие данные
-- **Выход** — полностью закрыть виджет
-
-### Быстрая авторизация
-При истёкшем токене появляется кнопка **"Войти через CLI"** — запускает `claude login` или `codex login` в отдельном окне.
+### Quick Login
+When a token expires, a **"Login via CLI"** button appears — launches `claude auth login` or `codex login` in a separate window.
 
 ---
 
-## Установка
+## Installation
 
-1. Нужен **Python 3.10+**: https://python.org (при установке отметь *Add to PATH*)
-2. В папке виджета:
+1. **Python 3.10+** required: https://python.org (check *Add to PATH* during install)
+2. In the widget folder:
    ```bash
    pip install pywebview pystray Pillow
    ```
-3. Запуск:
+3. Run:
    ```bash
    python widget.py
    ```
-   или двойной клик по **start_widget.vbs** — запустит без чёрного окна консоли
+   Or double-click **start_widget.vbs** to run without a console window.
 
-### Автозапуск при старте Windows
+### Autostart with Windows
 
-Нажми `Win+R` → `shell:startup` → скопируй туда **ярлык** на `start_widget.vbs`
+`Win+R` → `shell:startup` → copy a **shortcut** to `start_widget.vbs` there.
 
 ---
 
-## Интерфейс
+## Screenshots
 
+![Overview](preview/shot_overview.png)
 ![Claude](preview/shot_claude.png)
 ![Codex](preview/shot_codex.png)
-![Настройки](preview/shot_settings.png)
+![Settings](preview/shot_settings.png)
+![Tray](preview/shot_tray.png)
 
-### Управление окном
-- **Перетаскивание** — за верхнюю панель
-- **⟳** — обновить данные вручную
-- **◉** — переключить режим "поверх всех окон"
-- **⎯** — свернуть в трей
-- **✕** — закрыть виджет
+### Window Controls
+- **Drag** — by the top bar
+- **⟳** — refresh data manually
+- **◉** — toggle always-on-top
+- **⎯** — minimize to tray
+- **✕** — close widget
 
 ---
 
-## Откуда берутся данные
+## Data Sources
 
-Виджет ничего не отправляет наружу, кроме запросов к официальным серверам
-самих сервисов. Токены читаются из тех же файлов, что используют CLI:
+The widget only sends requests to official service APIs. Tokens are read from
+the same files used by the CLIs:
 
-| Сервис | Токен | Эндпоинт |
+| Service | Token | Endpoint |
 |---|---|---|
 | Claude Code | `~/.claude/.credentials.json` | `api.anthropic.com/api/oauth/usage` |
 | Codex CLI | `~/.codex/auth.json` | `chatgpt.com/backend-api/wham/usage` |
 
-Требование: быть залогиненным в каждом CLI (`/login` в Claude Code, `codex login`).
+You must be logged into each CLI (`/login` in Claude Code, `codex login`).
 
-### Про эндпоинты
+### About the Endpoints
 
-Оба эндпоинта — те же, что используют сами CLI и утилиты вроде CodexBar, но они
-недокументированные и могут поменяться. Если карточка вдруг перестала обновляться
-после апдейта CLI — напиши, поправим парсер (он и так принимает несколько
-вариантов имён полей).
+Both endpoints are the same ones used by the CLIs themselves and tools like CodexBar,
+but they are undocumented and may change. If a card stops updating after a CLI update —
+report it, and we'll fix the parser (it already accepts multiple field name variants).
 
 ---
 
-## Настройки
+## Settings
 
-### Через интерфейс
-Вкладка **Настройки** позволяет изменить:
-- **Интервал обновления** — как часто опрашивать API (15-600 секунд)
-- **Ширина окна** — 200-800 px
-- **Высота окна** — 300-1200 px
-- **Поверх всех окон** — вкл/выкл
+### Via UI
+The **Settings** tab lets you change:
+- **Refresh interval** — how often to poll the API (15–600 seconds)
+- **Window width** — 200–800 px
+- **Window height** — 300–1200 px
+- **Always on top** — on/off
+- **Language** — Русский / English
 
-### Через config.json
+### Via config.json
 ```json
 {
+  "language": "en",
   "refresh_interval_sec": 60,
   "window": {
     "width": 380,
@@ -118,35 +119,41 @@ Claude Code и Codex CLI в реальном времени.
 
 ---
 
-## Возможные проблемы
+## Troubleshooting
 
-* **HTTP 401/403** — токен истёк. Нажми "Войти через CLI" или залогинься вручную
-* **Пустое окно** — не установлен WebView2 Runtime (на Windows 11 он есть по умолчанию; если нет — https://developer.microsoft.com/microsoft-edge/webview2/)
-* **Красная полоска** — остаток ≤ 15%, пора готовиться к сбросу лимитов
-* **Иконка Python вместо виджета** — перезапусти приложение, иконка применится после создания окна
+* **HTTP 401/403** — token expired. Click "Login via CLI" or login manually
+* **Empty window** — WebView2 Runtime not installed (comes with Windows 11 by default; otherwise: https://developer.microsoft.com/microsoft-edge/webview2/)
+* **Red bar** — remaining ≤ 15%, prepare for limit reset
+* **Python icon instead of widget** — restart the app, the icon is applied after window creation
 
 ---
 
-## Разработка
+## Development
 
-### Зависимости
-- **pywebview** — окно на базе WebView2
-- **pystray** — иконки в системном трее
-- **Pillow** — генерация иконок для трея
+### Dependencies
+- **pywebview** — WebView2-based window
+- **pystray** — system tray icons
+- **Pillow** — tray icon generation
 
-### Структура
+### Project Structure
 ```
 usage-widget/
-├── widget.py          # Бэкенд: API, парсинг, треи
-├── ui.html            # Фронтенд: интерфейс на HTML/CSS/JS
-├── config.json        # Настройки (создаётся автоматически)
+├── widget.py          # Backend: API, parsing, tray
+├── ui.html            # Frontend: HTML/CSS/JS interface
+├── config.json        # Settings (auto-generated)
 ├── icon/
-│   ├── 512.png        # Исходная иконка приложения
-│   └── app.ico        # Windows-иконка (генерируется автоматически)
-├── preview/           # Скриншоты для README
-├── install.bat        # Установка зависимостей
-└── start_widget.vbs   # Запуск без консоли
+│   ├── 512.png        # Source app icon
+│   └── app.ico        # Windows icon (auto-generated)
+├── preview/           # README screenshots
+├── install.bat        # Dependency installer
+└── start_widget.vbs   # Console-free launcher
 ```
 
-### Лицензия
+### Building EXE
+```bash
+pip install pyinstaller
+python -m PyInstaller --onefile --windowed --name="AI-Usage" --icon="icon/app.ico" --add-data "ui.html;." --add-data "icon/512.png;icon" --add-data "icon/app.ico;icon" --collect-all pywebview --collect-all pystray widget.py
+```
+
+### License
 MIT
