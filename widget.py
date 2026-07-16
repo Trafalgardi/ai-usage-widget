@@ -931,13 +931,13 @@ class JsApi:
             os._exit(0)
 
     def minimize_to_tray(self):
-        if TRAY_AVAILABLE and self.window_ref:
+        if TRAY_AVAILABLE and TRAY.window_ref:
             TRAY.hide_window()
             return True
         return False
 
     def update_tray_icon(self):
-        if TRAY_AVAILABLE and self.window_ref:
+        if TRAY_AVAILABLE and TRAY.window_ref:
             TRAY._update_icon_with_data()
             return True
         return False
