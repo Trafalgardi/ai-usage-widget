@@ -752,10 +752,10 @@ class JsApi:
         return True
 
     def login_claude(self):
-        """Запускает claude login в фоне."""
+        """Запускает claude auth login в фоне."""
         try:
             proc = subprocess.Popen(
-                ["claude", "login"],
+                ["claude", "auth", "login"],
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
                 encoding='utf-8',
                 errors='replace'

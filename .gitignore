@@ -27,3 +27,4 @@ config.json
 .DS_Store
 Thumbs.db
 icon/app.ico
+*.spec
