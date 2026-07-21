@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://trafalgardi.github.io/ai-usage-widget/sitemap.xml
