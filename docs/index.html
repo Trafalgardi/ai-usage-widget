@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Usage Widget for Windows – Claude Code & Codex Usage Tracker</title>
+  <meta name="description" content="Free Windows desktop widget for tracking Claude Code and Codex CLI usage limits, weekly quotas, reset times and account status in real time.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="https://trafalgardi.github.io/ai-usage-widget/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="AI Usage Widget for Windows">
+  <meta property="og:description" content="Track Claude Code and Codex CLI usage limits, weekly quotas and reset times from a Windows desktop widget.">
+  <meta property="og:url" content="https://trafalgardi.github.io/ai-usage-widget/">
+  <meta property="og:image" content="https://raw.githubusercontent.com/Trafalgardi/ai-usage-widget/master/preview/shot_overview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#111827">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "AI Usage Widget",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Windows 10, Windows 11",
+    "description": "A free open-source Windows desktop widget for monitoring Claude Code and Codex CLI usage limits, quotas and reset times.",
+    "url": "https://trafalgardi.github.io/ai-usage-widget/",
+    "downloadUrl": "https://github.com/Trafalgardi/ai-usage-widget/releases/latest",
+    "softwareVersion": "Latest release",
+    "license": "https://opensource.org/license/mit",
+    "isAccessibleForFree": true,
+    "author": {
+      "@type": "Person",
+      "name": "Trafalgardi",
+      "url": "https://github.com/Trafalgardi"
+    }
+  }
+  </script>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #e5e7eb; background: #090d16; line-height: 1.6; }
+    a { color: inherit; }
+    .wrap { width: min(1080px, calc(100% - 32px)); margin: 0 auto; }
+    header { padding: 72px 0 42px; background: radial-gradient(circle at top, #1d3557 0, #090d16 58%); }
+    .eyebrow { color: #93c5fd; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .82rem; }
+    h1 { margin: 12px 0 18px; max-width: 900px; font-size: clamp(2.2rem, 6vw, 4.8rem); line-height: 1.04; }
+    h2 { margin-top: 0; font-size: clamp(1.6rem, 3vw, 2.4rem); }
+    p.lead { max-width: 760px; color: #cbd5e1; font-size: 1.18rem; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 28px 0; }
+    .button { display: inline-block; padding: 12px 18px; border-radius: 10px; text-decoration: none; font-weight: 750; background: #f8fafc; color: #111827; }
+    .button.secondary { border: 1px solid #475569; background: rgba(15,23,42,.65); color: #e5e7eb; }
+    .hero-image { display: block; width: min(850px, 100%); margin-top: 40px; border: 1px solid #334155; border-radius: 16px; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
+    section { padding: 60px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap: 16px; }
+    .card { padding: 22px; border: 1px solid #273449; border-radius: 14px; background: #101827; }
+    .card h3 { margin-top: 0; }
+    .muted { color: #94a3b8; }
+    .screens { display: grid; grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); gap: 18px; }
+    .screens img { width: 100%; border-radius: 12px; border: 1px solid #334155; }
+    details { padding: 18px 0; border-bottom: 1px solid #273449; }
+    summary { cursor: pointer; font-weight: 700; }
+    footer { padding: 40px 0 60px; color: #94a3b8; border-top: 1px solid #273449; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Windows 10 & 11 · Free · Open source</div>
+    <h1>AI Usage Widget for Windows</h1>
+    <p class="lead">Monitor Claude Code and Codex CLI usage limits, weekly quotas, reset countdowns and account status from an always-on-top desktop widget and the Windows system tray.</p>
+    <div class="actions">
+      <a class="button" href="https://github.com/Trafalgardi/ai-usage-widget/releases/latest">Download latest release</a>
+      <a class="button secondary" href="https://github.com/Trafalgardi/ai-usage-widget">View source on GitHub</a>
+    </div>
+    <img class="hero-image" src="https://raw.githubusercontent.com/Trafalgardi/ai-usage-widget/master/preview/shot_overview.png" alt="AI Usage Widget showing Claude Code and Codex CLI usage limits on Windows">
+  </div>
+</header>
+<main>
+  <section>
+    <div class="wrap">
+      <h2>Claude Code and Codex usage monitor</h2>
+      <div class="grid">
+        <article class="card"><h3>Real-time quotas</h3><p class="muted">See current 5-hour sessions, weekly usage and reset times without reopening each CLI.</p></article>
+        <article class="card"><h3>Windows tray</h3><p class="muted">Keep percentage indicators visible in the system tray while the app updates in the background.</p></article>
+        <article class="card"><h3>Account status</h3><p class="muted">Detect active, expiring and expired credentials and launch the appropriate CLI login flow.</p></article>
+        <article class="card"><h3>Local configuration</h3><p class="muted">Choose refresh frequency, window size, language and always-on-top behavior.</p></article>
+      </div>
+    </div>
+  </section>
+  <section>
+    <div class="wrap">
+      <h2>Screenshots</h2>
+      <div class="screens">
+        <img src="https://raw.githubusercontent.com/Trafalgardi/ai-usage-widget/master/preview/shot_claude.png" alt="Claude Code usage tracker screen">
+        <img src="https://raw.githubusercontent.com/Trafalgardi/ai-usage-widget/master/preview/shot_codex.png" alt="Codex CLI usage tracker screen">
+        <img src="https://raw.githubusercontent.com/Trafalgardi/ai-usage-widget/master/preview/shot_tray.png" alt="AI usage percentages in the Windows system tray">
+      </div>
+    </div>
+  </section>
+  <section>
+    <div class="wrap">
+      <h2>Frequently asked questions</h2>
+      <details><summary>What does the widget track?</summary><p class="muted">It displays Claude Code and Codex CLI session limits, weekly quotas, reset countdowns and account status when exposed by the services.</p></details>
+      <details><summary>Is this an API billing tracker?</summary><p class="muted">No. It focuses on subscription and CLI usage limits rather than API token costs.</p></details>
+      <details><summary>Does it work on Windows 10 and Windows 11?</summary><p class="muted">Yes. It is designed for current Windows 10 and Windows 11 installations with WebView2 available.</p></details>
+      <details><summary>Is it affiliated with Anthropic or OpenAI?</summary><p class="muted">No. AI Usage Widget is an independent open-source project.</p></details>
+    </div>
+  </section>
+</main>
+<footer><div class="wrap">AI Usage Widget · MIT License · <a href="https://github.com/Trafalgardi/ai-usage-widget">GitHub repository</a></div></footer>
+</body>
+</html>
