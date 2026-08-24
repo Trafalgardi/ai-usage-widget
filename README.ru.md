@@ -33,8 +33,15 @@ Claude Code и Codex CLI в реальном времени.
 - **Обновить** — запросить свежие данные
 - **Выход** — полностью закрыть виджет
 
-### Быстрая авторизация
-При истёкшем токене появляется кнопка **"Войти через CLI"** — запускает `claude auth login` или `codex login` в отдельном окне.
+### Состояние provider'ов и восстановление
+Точка входа v2 независимо определяет установку CLI, авторизацию и доступность usage. Она находит несколько Windows-установок, показывает выбранный executable и версию, сохраняет последние успешные данные при временной ошибке и получает рекомендованные действия из backend-state.
+
+- CLI отсутствует → установка официальным installer'ом provider'а
+- сессия Claude ещё refreshable → явный минимальный CLI probe до полного login
+- credentials отсутствуют или непригодны → вход через найденный абсолютный путь CLI
+- сеть, 429, 5xx или новый формат ответа → никогда не превращаются автоматически в Login
+
+Claude repair запускается только пользователем: он выполняет один минимальный реальный inference и может потратить небольшую часть quota. Виджет не обменивает и не изменяет OAuth refresh token самостоятельно.
 
 ---
 
@@ -47,7 +54,7 @@ Claude Code и Codex CLI в реальном времени.
    ```
 3. Запуск:
    ```bash
-   python widget.py
+   python widget_v2.py
    ```
    или двойной клик по **start_widget.vbs** — запустит без чёрного окна консоли
 
@@ -124,7 +131,7 @@ Claude Code и Codex CLI в реальном времени.
 
 ## Возможные проблемы
 
-* **HTTP 401/403** — токен истёк. Нажми "Войти через CLI" или залогинься вручную
+* **HTTP 401/403** — usage-запрос не прошёл авторизацию, но это ещё не означает обязательный полный login. Если сессия Claude refreshable, сначала используй «Обновить сессию»
 * **Пустое окно** — не установлен WebView2 Runtime (на Windows 11 он есть по умолчанию; если нет — https://developer.microsoft.com/microsoft-edge/webview2/)
 * **Красная полоска** — остаток ≤ 15%, пора готовиться к сбросу лимитов
 * **Иконка Python вместо виджета** — перезапусти приложение, иконка применится после создания окна
@@ -142,6 +149,12 @@ Claude Code и Codex CLI в реальном времени.
 ```
 usage-widget/
 ├── widget.py          # Бэкенд: API, парсинг, трей
+├── widget_v2.py       # Provider Health entry point
+├── provider_health.py # CLI discovery
+├── auth_health.py     # Безопасная проверка auth metadata
+├── usage_health.py    # Типизированные ошибки и last-good cache
+├── provider_actions.py
+├── session_repair.py
 ├── ui.html            # Фронтенд: интерфейс на HTML/CSS/JS
 ├── config.json        # Настройки (создаётся автоматически)
 ├── icon/
@@ -155,7 +168,7 @@ usage-widget/
 ### Сборка EXE
 ```bash
 pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name="AI-Usage" --icon="icon/app.ico" --add-data "ui.html;." --add-data "icon/512.png;icon" --add-data "icon/app.ico;icon" --collect-all pywebview --collect-all pystray widget.py
+python -m PyInstaller --onefile --windowed --name="AI-Usage" --icon="icon/app.ico" --add-data "ui.html;." --add-data "icon/512.png;icon" --add-data "icon/app.ico;icon" --collect-all pywebview --collect-all pystray widget_v2.py
 ```
 
 ### Лицензия

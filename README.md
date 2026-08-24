@@ -57,9 +57,16 @@ Minimize the app to the Windows system tray while it continues updating in the b
 - Hover for detailed usage information
 - Right-click to show, refresh, or exit
 
-### Quick login
+### Provider health and recovery
 
-When a token expires, the widget displays a **Login via CLI** button and starts `claude auth login` or `codex login` in a separate window.
+The v2 entry point separates CLI installation, authentication, and usage health. It can discover multiple Windows CLI installations, show the selected executable and version, preserve the last successful usage snapshot during temporary failures, and recommend an action from structured state.
+
+- Missing CLI → install with the official provider installer
+- Refreshable Claude session → run an explicit minimal Claude CLI probe before offering full login
+- Missing or unusable credentials → sign in with the discovered absolute CLI path
+- Network, rate-limit, server, or response-format failure → never infer that login is required
+
+The Claude refresh probe is user-initiated because it performs one minimal real inference and can consume a small amount of quota. The widget never exchanges or writes OAuth refresh tokens itself.
 
 ## Download and installation
 
@@ -84,7 +91,7 @@ pip install pywebview pystray Pillow
 Run the widget:
 
 ```bash
-python widget.py
+python widget_v2.py
 ```
 
 Or double-click `start_widget.vbs` to launch without a console window.
@@ -111,7 +118,7 @@ The widget sends requests only to the service endpoints used for retrieving acco
 | Claude Code | `~/.claude/.credentials.json` | `api.anthropic.com/api/oauth/usage` |
 | Codex CLI | `~/.codex/auth.json` | `chatgpt.com/backend-api/wham/usage` |
 
-You must already be logged in through each CLI using `/login`, `claude auth login`, or `codex login`.
+Authentication and install actions are also available from the provider card when the corresponding CLI state supports them.
 
 The usage endpoints are undocumented and may change. If a card stops updating after a CLI update, open an issue with the error details.
 
@@ -145,7 +152,7 @@ Example `config.json`:
 
 ### HTTP 401 or 403
 
-The token has expired. Use **Login via CLI** or log in manually.
+This is an authentication-related usage failure, but it does not necessarily mean that full login is required. If Claude still has a usable refresh session, choose **Refresh session** first. Sign in again only when the structured auth state requires it or repair fails.
 
 ### Empty window
 
@@ -194,6 +201,12 @@ No. This is an independent open-source project and is not an official Anthropic 
 ```text
 usage-widget/
 ├── widget.py
+├── widget_v2.py
+├── provider_health.py
+├── auth_health.py
+├── usage_health.py
+├── provider_actions.py
+├── session_repair.py
 ├── ui.html
 ├── config.json
 ├── icon/
@@ -207,7 +220,7 @@ usage-widget/
 
 ```bash
 pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name="AI-Usage" --icon="icon/app.ico" --add-data "ui.html;." --add-data "icon/512.png;icon" --add-data "icon/app.ico;icon" --collect-all pywebview --collect-all pystray widget.py
+python -m PyInstaller --onefile --windowed --name="AI-Usage" --icon="icon/app.ico" --add-data "ui.html;." --add-data "icon/512.png;icon" --add-data "icon/app.ico;icon" --collect-all pywebview --collect-all pystray widget_v2.py
 ```
 
 ## Website

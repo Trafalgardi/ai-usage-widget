@@ -4,6 +4,26 @@
 
 Evolve the widget from a quota viewer into a Windows control center for AI CLIs. The application should understand the lifecycle of each provider instead of treating every failure as an authentication failure.
 
+## Current implementation status
+
+Implemented on `v2/provider-health`:
+
+- Normalized CLI, auth, usage, and action state for Claude Code and Codex CLI.
+- Windows discovery through PATH, `where.exe`, and confirmed installation locations; absolute-path version and action execution.
+- Claude access/refresh expiry inspection, scopes and subscription metadata without exposing token values.
+- Backend-selected install, login, refresh-session, and retry actions.
+- Official Windows native installers for Claude Code and Codex CLI with post-install rediscovery and version validation.
+- Explicit Claude refresh-before-login probe through the official CLI. There is no direct refresh-token exchange.
+- Typed HTTP/network/format errors and an in-memory last-known-good usage snapshot.
+- Transitional provider-health UI integration while the legacy usage/tray runtime remains intact.
+
+Still pending:
+
+- Persistent last-good cache and adaptive refresh/backoff.
+- CLI update detection and one-click update UX.
+- A dedicated diagnostics view and richer path-conflict repair.
+- Removal of the transitional `widget_v2.py` patch after provider modules fully own the runtime.
+
 The provider lifecycle is split into four independent layers:
 
 1. **Installation** — whether the CLI exists, which executable will run, version, install method and duplicate installations.
@@ -149,6 +169,30 @@ Diagnostics view:
 - Local history database for quota snapshots.
 - Burn-rate and projected exhaustion.
 - Notifications for configurable thresholds and quota resets.
+
+## Release direction
+
+### v2 Provider Health
+
+- CLI discovery and installation.
+- Authentication health and recovery.
+- Usage health and safe recovery actions.
+
+### v2.x
+
+- CLI update detection and one-click update.
+- Persistent last-good cache.
+- Adaptive refresh with Retry-After, backoff, and jitter.
+- Notifications.
+
+### v3
+
+- Local usage history.
+- Burn rate and projected exhaustion.
+- Daily and weekly charts.
+- Provider plugin architecture.
+
+Future providers to evaluate after the lifecycle contract stabilizes: Gemini CLI, OpenCode, and other AI developer CLIs. They are not part of the current implementation.
 
 ## Phase 5 — Provider architecture
 
