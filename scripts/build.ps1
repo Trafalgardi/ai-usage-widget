@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Python = "py -3.12",
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+    [switch]$HeadlessSmoke
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,7 +31,7 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 
 $Executable = Join-Path $RepositoryRoot "dist\AI-CLI-Control-Center.exe"
 if (-not (Test-Path -LiteralPath $Executable)) { throw "Build did not create $Executable" }
-& (Join-Path $RepositoryRoot "scripts\smoke.ps1") -Executable $Executable
+& (Join-Path $RepositoryRoot "scripts\smoke.ps1") -Executable $Executable -Headless:$HeadlessSmoke
 
 $ZipPath = Join-Path $RepositoryRoot "dist\AI-CLI-Control-Center-v2.0.0-windows-x64.zip"
 Compress-Archive -LiteralPath $Executable -DestinationPath $ZipPath -Force
