@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import provider_actions
+import widget_v2
 
 
 class ProviderActionTests(unittest.TestCase):
@@ -32,12 +33,26 @@ class ProviderActionTests(unittest.TestCase):
             "state": "installed",
             "executable_path": r"C:\codex.exe",
         }), patch("provider_actions.os.name", "nt"), patch(
-            "provider_actions.subprocess.run"
+            "provider_actions.run_process"
         ) as run:
             result = provider_actions.install_provider("codex")
         self.assertTrue(result["success"])
         self.assertEqual("already_installed", result["status"])
         run.assert_not_called()
+
+    def test_v2_action_returns_fresh_health_for_immediate_ui_update(self):
+        api = widget_v2.V2JsApi()
+        fresh = {"schema_version": 2, "providers": {"claude": {
+            "cli": {"state": "installed"},
+        }}}
+        with patch("widget_v2.run_install_provider", return_value={
+            "success": True,
+            "status": "installed",
+        }), patch.object(api, "_provider_health", return_value=fresh) as health:
+            result = api.execute_provider_action("claude", "install")
+
+        self.assertEqual(fresh, result["provider_health"])
+        health.assert_called_once_with(force=True)
 
 
 if __name__ == "__main__":

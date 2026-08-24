@@ -7,24 +7,14 @@ supported path that exercises Claude Code's own refresh logic. This action is
 explicit because it consumes a very small amount of quota.
 """
 
-import os
-import subprocess
 import threading
 
 from auth_health import inspect_claude_auth
 from provider_health import discover_cli
+from process_runner import run_process
 
 
-_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 _REPAIR_LOCK = threading.Lock()
-
-
-def _command(executable_path, args):
-    command = [executable_path] + list(args)
-    suffix = os.path.splitext(executable_path)[1].lower()
-    if os.name == "nt" and suffix in (".cmd", ".bat"):
-        return ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)]
-    return command
 
 
 def refresh_claude_session(timeout=45):
@@ -66,31 +56,20 @@ def refresh_claude_session(timeout=45):
                 "auth": before,
             }
 
-        try:
-            proc = subprocess.run(
-                _command(executable, ["-p", "Reply exactly OK."]),
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-                creationflags=_CREATE_NO_WINDOW if os.name == "nt" else 0,
-            )
-        except subprocess.TimeoutExpired:
+        proc = run_process(executable, ["-p", "Reply exactly OK."], timeout=timeout)
+        if proc["timed_out"]:
             return {
                 "success": False,
                 "status": "refresh_probe_timeout",
                 "provider_id": "claude",
                 "auth": before,
             }
-        except Exception as exc:
+        if not proc["started"]:
             return {
                 "success": False,
                 "status": "refresh_probe_failed_to_start",
                 "provider_id": "claude",
-                "error": f"{type(exc).__name__}: {exc}",
+                "error": proc["error"],
                 "auth": before,
             }
 
@@ -102,10 +81,10 @@ def refresh_claude_session(timeout=45):
             recovered = after_exp > before_exp
 
         return {
-            "success": bool(recovered and proc.returncode == 0),
+            "success": bool(recovered and proc["exit_code"] == 0),
             "status": "session_refreshed" if recovered else "refresh_failed",
             "provider_id": "claude",
-            "exit_code": proc.returncode,
+            "exit_code": proc["exit_code"],
             "auth": after,
             "cli": cli,
         }

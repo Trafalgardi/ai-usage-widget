@@ -10,9 +10,9 @@ import shutil
 import subprocess
 
 from provider_health import discover_cli
+from process_runner import command_for, run_process
 
 
-_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 _CREATE_NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
 
 
@@ -49,14 +49,6 @@ def _tail(text, limit=4000):
     return text[-limit:] if len(text) > limit else text
 
 
-def _cli_command(executable_path, args):
-    command = [executable_path] + list(args)
-    suffix = os.path.splitext(executable_path)[1].lower()
-    if os.name == "nt" and suffix in (".cmd", ".bat"):
-        return ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)]
-    return command
-
-
 def install_provider(provider_id, timeout=300):
     """Install a missing provider using its official Windows installer."""
     if provider_id not in INSTALL_SPECS:
@@ -90,8 +82,7 @@ def install_provider(provider_id, timeout=300):
         }
 
     spec = INSTALL_SPECS[provider_id]
-    command = [
-        powershell,
+    args = [
         "-NoLogo",
         "-NoProfile",
         "-ExecutionPolicy",
@@ -100,41 +91,31 @@ def install_provider(provider_id, timeout=300):
         spec["script"],
     ]
 
-    try:
-        proc = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            creationflags=_CREATE_NO_WINDOW,
-        )
-    except subprocess.TimeoutExpired:
+    proc = run_process(powershell, args, timeout=timeout)
+    if proc["timed_out"]:
         return {
             "success": False,
             "status": "installer_timeout",
             "provider_id": provider_id,
         }
-    except Exception as exc:
+    if not proc["started"]:
         return {
             "success": False,
             "status": "installer_failed_to_start",
             "provider_id": provider_id,
-            "error": f"{type(exc).__name__}: {exc}",
+            "error": proc["error"],
         }
 
     after = discover_cli(provider_id)
-    success = proc.returncode == 0 and after.get("state") == "installed"
+    success = proc["exit_code"] == 0 and after.get("state") == "installed"
     return {
         "success": success,
         "status": "installed" if success else "install_failed",
         "provider_id": provider_id,
         "install_method": spec["method"],
-        "exit_code": proc.returncode,
-        "stdout": _tail(proc.stdout),
-        "stderr": _tail(proc.stderr),
+        "exit_code": proc["exit_code"],
+        "stdout": _tail(proc["stdout"]),
+        "stderr": _tail(proc["stderr"]),
         "health": after,
     }
 
@@ -161,7 +142,7 @@ def login_provider(provider_id):
 
     try:
         proc = subprocess.Popen(
-            _cli_command(executable, args),
+            command_for(executable, args),
             creationflags=_CREATE_NEW_CONSOLE if os.name == "nt" else 0,
         )
     except Exception as exc:

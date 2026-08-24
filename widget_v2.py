@@ -60,10 +60,13 @@ V2_UI_PATCH = r"""
 
       if(result && result.success){
         button.textContent = (typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Done" : "Готово";
+        if(result.provider_health && typeof DATA !== "undefined" && DATA){
+          DATA.provider_health = result.provider_health;
+          if(typeof renderAll === "function") renderAll();
+        }
         await window.pywebview.api.refresh_now();
-        setTimeout(() => {
-          if(typeof pull === "function") pull(true);
-        }, 700);
+        setTimeout(() => { if(typeof pull === "function") pull(true); }, 1500);
+        setTimeout(() => { if(typeof pull === "function") pull(true); }, 4000);
       }else{
         button.textContent = (result && (result.status || result.error)) || ((typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Failed" : "Ошибка");
         button.disabled = false;
@@ -208,9 +211,7 @@ class V2JsApi(legacy_widget.JsApi):
             }
 
     def install_provider(self, provider_id):
-        result = run_install_provider(provider_id)
-        self._invalidate_health()
-        return result
+        return self.execute_provider_action(provider_id, "install")
 
     def refresh_provider_session(self, provider_id):
         if provider_id != "claude":
@@ -219,9 +220,7 @@ class V2JsApi(legacy_widget.JsApi):
                 "status": "refresh_not_supported",
                 "provider_id": provider_id,
             }
-        result = refresh_claude_session()
-        self._invalidate_health()
-        return result
+        return self.execute_provider_action(provider_id, "refresh_session")
 
     def execute_provider_action(self, provider_id, action_id):
         """Dispatch only backend-declared, explicitly allowlisted actions."""
@@ -239,6 +238,10 @@ class V2JsApi(legacy_widget.JsApi):
         else:
             return {"success": False, "status": "unsupported_action"}
         self._invalidate_health()
+        try:
+            result["provider_health"] = copy.deepcopy(self._provider_health(force=True))
+        except Exception as exc:
+            result["health_error"] = f"{type(exc).__name__}: {exc}"
         return result
 
     def _login_compat(self, provider_id):

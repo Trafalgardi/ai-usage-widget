@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import session_repair
 
@@ -7,7 +7,7 @@ import session_repair
 class SessionRepairTests(unittest.TestCase):
     def test_refresh_not_needed_for_valid_session(self):
         with patch("session_repair.inspect_claude_auth", return_value={"state": "valid"}), patch(
-            "session_repair.subprocess.run"
+            "session_repair.run_process"
         ) as run:
             result = session_repair.refresh_claude_session()
         self.assertTrue(result["success"])
@@ -25,22 +25,26 @@ class SessionRepairTests(unittest.TestCase):
                 "access_expires_at": 200,
             },
         ]
-        proc = MagicMock()
-        proc.returncode = 0
+        proc = {
+            "started": True,
+            "timed_out": False,
+            "exit_code": 0,
+            "stdout": "OK\n",
+            "stderr": "",
+            "error": None,
+        }
         with patch("session_repair.inspect_claude_auth", side_effect=states), patch(
             "session_repair.discover_cli",
             return_value={
                 "state": "installed",
                 "executable_path": r"C:\Users\me\.local\bin\claude.exe",
             },
-        ), patch("session_repair.subprocess.run", return_value=proc) as run:
+        ), patch("session_repair.run_process", return_value=proc) as run:
             result = session_repair.refresh_claude_session()
         self.assertTrue(result["success"])
         self.assertEqual("session_refreshed", result["status"])
-        command = run.call_args.args[0]
-        self.assertEqual(r"C:\Users\me\.local\bin\claude.exe", command[0])
-        self.assertEqual(["-p", "Reply exactly OK."], command[1:])
-        self.assertIs(session_repair.subprocess.DEVNULL, run.call_args.kwargs["stdin"])
+        self.assertEqual(r"C:\Users\me\.local\bin\claude.exe", run.call_args.args[0])
+        self.assertEqual(["-p", "Reply exactly OK."], run.call_args.args[1])
 
     def test_missing_cli_does_not_launch_probe(self):
         with patch(
@@ -49,7 +53,7 @@ class SessionRepairTests(unittest.TestCase):
         ), patch(
             "session_repair.discover_cli",
             return_value={"state": "missing", "executable_path": None},
-        ), patch("session_repair.subprocess.run") as run:
+        ), patch("session_repair.run_process") as run:
             result = session_repair.refresh_claude_session()
         self.assertFalse(result["success"])
         self.assertEqual("cli_missing", result["status"])
