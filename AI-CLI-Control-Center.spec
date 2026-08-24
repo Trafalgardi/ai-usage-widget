@@ -33,5 +33,5 @@ exe = EXE(
     upx=False,
     console=False,
     icon="icon/app.ico",
-    version="build/windows-version.txt",
+    version="packaging/windows-version.txt",
 )
