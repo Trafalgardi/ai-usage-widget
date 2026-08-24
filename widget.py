@@ -34,9 +34,14 @@ try:
 except ImportError:
     TRAY_AVAILABLE = False
 
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
+APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = (
+    os.path.dirname(os.path.abspath(sys.executable))
+    if getattr(sys, "frozen", False)
+    else APP_DIR
+)
 HOME = os.path.expanduser("~")
-CONFIG_PATH = os.path.join(APP_DIR, "config.json")
+CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
 
 DEFAULT_CONFIG = {
     "refresh_interval_sec": 60,
