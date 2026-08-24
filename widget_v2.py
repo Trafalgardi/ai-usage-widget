@@ -32,7 +32,7 @@ V2_UI_PATCH = r"""
   document.head.appendChild(style);
 
   function actionLabel(action, id){
-    const en = (window.LANG || "ru") === "en";
+    const en = (typeof LANG !== "undefined" ? LANG : "ru") === "en";
     if(action === "install") return en ? `Install ${id === "claude" ? "Claude Code" : "Codex CLI"}` : `Установить ${id === "claude" ? "Claude Code" : "Codex CLI"}`;
     if(action === "refresh_session") return en ? "Refresh session" : "Обновить сессию";
     if(action === "login") return en ? "Sign in" : "Войти";
@@ -40,7 +40,7 @@ V2_UI_PATCH = r"""
   }
 
   function statusLabel(cli){
-    const en = (window.LANG || "ru") === "en";
+    const en = (typeof LANG !== "undefined" ? LANG : "ru") === "en";
     if(cli.state === "missing") return en ? "CLI not installed" : "CLI не установлен";
     if(cli.state === "broken") return en ? "CLI found but does not start" : "CLI найден, но не запускается";
     if(cli.state === "installed") return en ? "CLI installed" : "CLI установлен";
@@ -50,7 +50,7 @@ V2_UI_PATCH = r"""
   async function runAction(id, action, button){
     button.disabled = true;
     const original = button.textContent;
-    button.textContent = (window.LANG || "ru") === "en" ? "Working…" : "Выполняется…";
+    button.textContent = (typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Working…" : "Выполняется…";
     try{
       let result;
       if(action === "install"){
@@ -62,13 +62,13 @@ V2_UI_PATCH = r"""
       }
 
       if(result && result.success){
-        button.textContent = (window.LANG || "ru") === "en" ? "Done" : "Готово";
+        button.textContent = (typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Done" : "Готово";
         await window.pywebview.api.refresh_now();
         setTimeout(() => {
           if(typeof pull === "function") pull(true);
         }, 700);
       }else{
-        button.textContent = (result && (result.status || result.error)) || ((window.LANG || "ru") === "en" ? "Failed" : "Ошибка");
+        button.textContent = (result && (result.status || result.error)) || ((typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Failed" : "Ошибка");
         button.disabled = false;
       }
     }catch(e){
@@ -77,13 +77,13 @@ V2_UI_PATCH = r"""
     }
   }
 
-  const originalRenderDetail = window.renderDetail;
+  const originalRenderDetail = typeof renderDetail === "function" ? renderDetail : null;
   if(typeof originalRenderDetail !== "function") return;
 
-  window.renderDetail = function(id){
+  renderDetail = function(id){
     originalRenderDetail(id);
 
-    const providerHealth = window.DATA && DATA.provider_health && DATA.provider_health.providers && DATA.provider_health.providers[id];
+    const providerHealth = typeof DATA !== "undefined" && DATA && DATA.provider_health && DATA.provider_health.providers && DATA.provider_health.providers[id];
     if(!providerHealth) return;
 
     const detail = document.querySelector(`#page-${id} .detail`);
@@ -105,7 +105,7 @@ V2_UI_PATCH = r"""
     const version = cli.version ? ` · ${cli.version}` : "";
     const method = cli.install_method ? ` · ${cli.install_method}` : "";
     const conflict = cli.path_conflict
-      ? `<div class="warn">${(window.LANG || "ru") === "en" ? "Multiple CLI installations detected; PATH may select an old copy." : "Найдено несколько установок CLI; PATH может запускать старую копию."}</div>`
+      ? `<div class="warn">${(typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Multiple CLI installations detected; PATH may select an old copy." : "Найдено несколько установок CLI; PATH может запускать старую копию."}</div>`
       : "";
     health.innerHTML = `<strong>${statusLabel(cli)}</strong>${version}${method}${conflict}`;
     detail.appendChild(health);
