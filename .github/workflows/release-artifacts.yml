@@ -20,7 +20,7 @@ jobs:
           cache-dependency-path: requirements-build.txt
       - name: Build and smoke-test
         shell: pwsh
-        run: ./scripts/build.ps1 -Python "python"
+        run: ./scripts/build.ps1 -Python "python" -HeadlessSmoke
       - name: Generate CycloneDX SBOM
         uses: anchore/sbom-action@v0
         with:
