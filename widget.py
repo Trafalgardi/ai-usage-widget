@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 
 from app_storage import ConfigStore
 from usage_health import LastGoodUsageStore, classify_exception, usage_error
+from usage_history import HistoryStore
 from version import APP_NAME
 
 try:
@@ -31,17 +32,21 @@ except ImportError:
     TRAY_AVAILABLE = False
 
 APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+LEGACY_DATA_DIR = os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys, "frozen", False) else APP_DIR
 DATA_DIR = (
-    os.path.dirname(os.path.abspath(sys.executable))
+    os.path.join(os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or LEGACY_DATA_DIR, APP_NAME)
     if getattr(sys, "frozen", False)
     else APP_DIR
 )
 HOME = os.path.expanduser("~")
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
+HISTORY_PATH = os.path.join(DATA_DIR, "history.json")
 
 DEFAULT_CONFIG = {
     "language": "en",
     "refresh_interval_sec": 60,
+    "history": {"enabled": True, "retention_days": 30},
+    "alerts": {"enabled": False, "remaining_threshold_pct": 15, "cooldown_sec": 3600},
     "window": {"x": None, "y": None, "width": 380, "height": 600, "on_top": True},
     "opencode": {
         # Если у OpenCode появится/известен официальный usage-эндпоинт — впиши его сюда.
@@ -60,6 +65,8 @@ DEFAULT_CONFIG = {
 }
 
 SETTINGS_STORE = ConfigStore(CONFIG_PATH, DEFAULT_CONFIG)
+if getattr(sys, "frozen", False):
+    SETTINGS_STORE.migrate_from(os.path.join(LEGACY_DATA_DIR, "config.json"))
 
 
 # ----------------------------------------------------------------------------
@@ -675,9 +682,29 @@ class TrayManager:
         if self.window_ref:
             self.window_ref.hide()
 
+    def notify_alerts(self, alerts):
+        """Send opt-in local notifications through an existing tray icon."""
+        if not TRAY_AVAILABLE or not alerts:
+            return
+        icon = self.icon_claude or self.icon_codex
+        if not icon or not hasattr(icon, "notify"):
+            return
+        for alert in alerts:
+            provider = "Claude" if alert.get("provider_id") == "claude" else "Codex"
+            remaining = alert.get("remaining_pct")
+            if alert.get("kind") == "projected_exhaustion":
+                message = f"{provider} may exhaust this limit before it resets."
+            else:
+                message = f"{provider} has {remaining:g}% remaining in this limit window."
+            try:
+                icon.notify(message, APP_NAME)
+            except Exception:
+                pass
+
 
 TRAY = TrayManager()
 LAST_GOOD_USAGE = LastGoodUsageStore()
+HISTORY_STORE = HistoryStore(HISTORY_PATH)
 
 
 def refresh_all():
@@ -702,10 +729,13 @@ def refresh_all():
                                     "unknown", f"{type(exc).__name__}: {exc}"
                                 )}
                 providers[name] = LAST_GOOD_USAGE.apply(provider)
+        captured_at = time.time()
+        insights = HISTORY_STORE.process(providers, CFG, captured_at)
         with STATE.lock:
-            STATE.snapshot = {"updated_at": time.time(), "providers": providers}
+            STATE.snapshot = {"updated_at": captured_at, "providers": providers, "insights": insights}
         TRAY.update_tooltip()
         TRAY._update_icon_with_data()
+        TRAY.notify_alerts(insights.get("alerts") or [])
     finally:
         STATE.refresh_lock.release()
 
@@ -865,6 +895,20 @@ class JsApi:
             return True
         except Exception as e:
             return str(e)
+
+    def clear_history(self):
+        try:
+            HISTORY_STORE.clear()
+            with STATE.lock:
+                STATE.snapshot["insights"] = {
+                    "enabled": bool((CFG.get("history") or {}).get("enabled", True)),
+                    "analytics": {},
+                    "alerts": [],
+                    "snapshot_count": 0,
+                }
+            return {"success": True, "status": "history_cleared"}
+        except Exception as exc:
+            return {"success": False, "status": "history_clear_failed", "error": type(exc).__name__}
 
     def close(self):
         STATE.shutdown_event.set()

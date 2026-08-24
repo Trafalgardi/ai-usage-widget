@@ -27,7 +27,9 @@ def startup_status():
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
             value, _ = winreg.QueryValueEx(key, APP_ID)
-        return {"supported": True, "enabled": bool(value)}
+        current = _startup_command()
+        matches_current = bool(value) and os.path.normcase(str(value).strip()).casefold() == os.path.normcase(current.strip()).casefold()
+        return {"supported": True, "enabled": matches_current, "stale_entry": bool(value) and not matches_current}
     except FileNotFoundError:
         return {"supported": True, "enabled": False}
     except OSError as exc:

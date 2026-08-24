@@ -26,14 +26,16 @@ if (-not $SkipInstall) {
 
 & $BuildPython -m unittest discover -s tests -v
 if ($LASTEXITCODE -ne 0) { throw "Unit tests failed" }
+$Version = (& $BuildPython -c "from version import __version__; print(__version__)").Trim()
+if (-not $Version) { throw "Could not determine application version" }
 & $BuildPython -m PyInstaller --clean --noconfirm AI-CLI-Control-Center.spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 
 $Executable = Join-Path $RepositoryRoot "dist\AI-CLI-Control-Center.exe"
 if (-not (Test-Path -LiteralPath $Executable)) { throw "Build did not create $Executable" }
-& (Join-Path $RepositoryRoot "scripts\smoke.ps1") -Executable $Executable -Headless:$HeadlessSmoke
+& (Join-Path $RepositoryRoot "scripts\smoke.ps1") -Executable $Executable -Headless:$HeadlessSmoke -ExpectedVersion $Version
 
-$ZipPath = Join-Path $RepositoryRoot "dist\AI-CLI-Control-Center-v2.0.0-windows-x64.zip"
+$ZipPath = Join-Path $RepositoryRoot "dist\AI-CLI-Control-Center-v$Version-windows-x64.zip"
 Compress-Archive -LiteralPath $Executable -DestinationPath $ZipPath -Force
 Get-FileHash -Algorithm SHA256 -LiteralPath $Executable, $ZipPath |
     ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |

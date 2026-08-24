@@ -33,6 +33,7 @@ class UiSmokeApi:
                 "codex": {"id": "codex", "name": "Codex CLI", "ok": True, "windows": [], "meta": {}},
             },
             "provider_health": {"schema_version": 2, "providers": {}},
+            "insights": {"enabled": True, "analytics": {}, "alerts": [], "snapshot_count": 0},
             "token_status": {"claude": None, "codex": None},
             "_config": {"language": "en", "refresh_interval_sec": 60, "window": {"width": 380, "height": 600, "on_top": False}},
             "on_top": False,

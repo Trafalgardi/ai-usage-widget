@@ -23,6 +23,8 @@ wheels/
 *.egg
 MANIFEST
 config.json
+history.json
+history.json.corrupt-*
 *.log
 .DS_Store
 Thumbs.db
