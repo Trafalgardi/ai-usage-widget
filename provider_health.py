@@ -7,10 +7,8 @@ token values. It is the first layer of the v2 provider-health architecture.
 
 import os
 import shutil
-import subprocess
 
-
-_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+from process_runner import run_process
 
 
 def _norm_path(path):
@@ -54,37 +52,38 @@ def _infer_install_method(provider_id, path):
 
 
 def _run_version(path, args):
-    command = [path] + list(args)
-    suffix = os.path.splitext(path)[1].lower()
-    if os.name == "nt" and suffix in (".cmd", ".bat"):
-        command = ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)]
-    try:
-        proc = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=5,
-            creationflags=_CREATE_NO_WINDOW if os.name == "nt" else 0,
-        )
-    except Exception as exc:
+    proc = run_process(path, args, timeout=5)
+    if proc["error"]:
         return {
             "works": False,
             "version": None,
-            "error": f"{type(exc).__name__}: {exc}",
+            "error": proc["error"],
         }
 
-    output = (proc.stdout or "").strip() or (proc.stderr or "").strip()
+    output = proc["stdout"].strip() or proc["stderr"].strip()
     first_line = output.splitlines()[0].strip() if output else None
     return {
-        "works": proc.returncode == 0,
-        "version": first_line if proc.returncode == 0 else None,
-        "error": None if proc.returncode == 0 else (
-            first_line or f"exit code {proc.returncode}"
+        "works": proc["exit_code"] == 0,
+        "version": first_line if proc["exit_code"] == 0 else None,
+        "error": None if proc["exit_code"] == 0 else (
+            first_line or f"exit code {proc['exit_code']}"
         ),
     }
+
+
+def _where_candidates(command):
+    """Return every executable reported by Windows PATH resolution."""
+    if os.name != "nt":
+        return []
+    where = shutil.which("where.exe") or os.path.join(
+        os.environ.get("SystemRoot", r"C:\Windows"), "System32", "where.exe"
+    )
+    if not os.path.isfile(where):
+        return []
+    result = run_process(where, [command], timeout=5)
+    if result["exit_code"] != 0:
+        return []
+    return [line.strip() for line in result["stdout"].splitlines() if line.strip()]
 
 
 def _provider_spec(provider_id):
@@ -155,6 +154,15 @@ def discover_cli(provider_id):
             path_selected,
             _infer_install_method(provider_id, path_selected),
             "PATH",
+        )
+
+    for path in _where_candidates(spec["command"]):
+        _add_candidate(
+            candidates,
+            seen,
+            path,
+            _infer_install_method(provider_id, path),
+            "where.exe",
         )
 
     for path, method, source in spec["known"]:

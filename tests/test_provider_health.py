@@ -15,7 +15,9 @@ class ProviderHealthTests(unittest.TestCase):
     @patch("provider_health.os.path.isfile", return_value=False)
     @patch("provider_health.shutil.which", return_value=None)
     def test_missing_when_no_executable_exists(self, _which, _isfile):
-        with patch("provider_health._provider_spec", return_value=self._spec()):
+        with patch("provider_health._provider_spec", return_value=self._spec()), patch(
+            "provider_health._where_candidates", return_value=[]
+        ):
             health = provider_health.discover_cli("claude")
         self.assertEqual("missing", health["state"])
         self.assertIsNone(health["executable_path"])
@@ -30,7 +32,7 @@ class ProviderHealthTests(unittest.TestCase):
         with patch("provider_health._provider_spec", return_value=spec), patch(
             "provider_health._run_version",
             return_value={"works": True, "version": "2.1.226", "error": None},
-        ):
+        ), patch("provider_health._where_candidates", return_value=[]):
             health = provider_health.discover_cli("claude")
         self.assertEqual("installed", health["state"])
         self.assertTrue(health["executable_path"].endswith(r"path\claude.exe"))
@@ -46,7 +48,7 @@ class ProviderHealthTests(unittest.TestCase):
         with patch("provider_health._provider_spec", return_value=spec), patch(
             "provider_health._run_version",
             return_value={"works": True, "version": "2.1.226", "error": None},
-        ):
+        ), patch("provider_health._where_candidates", return_value=[]):
             health = provider_health.discover_cli("claude")
         self.assertEqual("installed", health["state"])
         self.assertEqual("native", health["install_method"])
@@ -61,10 +63,31 @@ class ProviderHealthTests(unittest.TestCase):
         with patch("provider_health._provider_spec", return_value=spec), patch(
             "provider_health._run_version",
             return_value={"works": False, "version": None, "error": "exit code 1"},
-        ):
+        ), patch("provider_health._where_candidates", return_value=[]):
             health = provider_health.discover_cli("claude")
         self.assertEqual("broken", health["state"])
         self.assertIsNone(health["executable_path"])
+
+    @patch("provider_health.os.path.isfile", return_value=True)
+    @patch("provider_health.shutil.which", return_value=r"C:\npm\codex.cmd")
+    def test_where_detects_additional_path_installations(self, _which, _isfile):
+        with patch("provider_health._provider_spec", return_value={
+            "command": "codex",
+            "version_args": ["--version"],
+            "known": [],
+        }), patch("provider_health._where_candidates", return_value=[
+            r"C:\npm\codex.cmd",
+            r"C:\Program Files\WindowsApps\OpenAI.Codex\codex.exe",
+        ]), patch("provider_health._run_version", return_value={
+            "works": True,
+            "version": "codex-cli 1.0.0",
+            "error": None,
+        }):
+            health = provider_health.discover_cli("codex")
+
+        self.assertEqual(2, len(health["detected_copies"]))
+        self.assertTrue(health["path_conflict"])
+        self.assertTrue(health["executable_path"].endswith(r"npm\codex.cmd"))
 
 
 if __name__ == "__main__":

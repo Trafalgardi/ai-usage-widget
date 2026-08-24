@@ -728,62 +728,6 @@ class JsApi:
         snap["_config"] = copy.deepcopy(CFG)
         return snap
 
-    def get_token_status(self):
-        """Проверяет статус токенов Claude и Codex."""
-        result = {"claude": None, "codex": None}
-        
-        # Claude
-        cred_paths = [
-            os.path.join(HOME, ".claude", ".credentials.json"),
-            os.path.join(HOME, ".config", "claude", ".credentials.json"),
-        ]
-        for p in cred_paths:
-            if os.path.exists(p):
-                try:
-                    with open(p, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    oauth = data.get("claudeAiOauth") or data.get("oauth") or {}
-                    exp = oauth.get("expiresAt")
-                    if exp:
-                        exp_epoch = iso_to_epoch(exp)
-                        if exp_epoch:
-                            now = time.time()
-                            remaining = exp_epoch - now
-                            if remaining <= 0:
-                                result["claude"] = {"status": "expired", "remaining": 0}
-                            elif remaining < 3600:
-                                result["claude"] = {"status": "expiring", "remaining": remaining}
-                            else:
-                                result["claude"] = {"status": "valid", "remaining": remaining}
-                except Exception:
-                    pass
-                break
-        
-        # Codex
-        auth_path = os.path.join(_codex_home(), "auth.json")
-        if os.path.exists(auth_path):
-            try:
-                with open(auth_path, "r", encoding="utf-8") as f:
-                    auth = json.load(f)
-                tokens = auth.get("tokens") or {}
-                access = tokens.get("access_token") or auth.get("access_token")
-                if access:
-                    claims = _jwt_claims(access)
-                    exp = claims.get("exp")
-                    if exp:
-                        now = time.time()
-                        remaining = exp - now
-                        if remaining <= 0:
-                            result["codex"] = {"status": "expired", "remaining": 0}
-                        elif remaining < 3600:
-                            result["codex"] = {"status": "expiring", "remaining": remaining}
-                        else:
-                            result["codex"] = {"status": "valid", "remaining": remaining}
-            except Exception:
-                pass
-        
-        return result
-
     def refresh_now(self):
         if STATE.refresh_lock.locked():
             return False
