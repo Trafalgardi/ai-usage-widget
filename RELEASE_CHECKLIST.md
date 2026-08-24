@@ -1,30 +1,36 @@
-# v2 release checklist
+# v2 release checklist and record
 
-Implementation can be completed locally; the actions below require repository-owner authority or release credentials.
+This file is a status record, not an unreviewed list of empty boxes. Detailed public artifact evidence is in `POST_RELEASE_NOTES.md`.
 
 ## Before tagging
 
-- [ ] Review the complete diff and `CHANGELOG.md`; choose the final v2 version/tag.
-- [ ] Run `./scripts/build.ps1` on a clean Windows checkout and retain the EXE, ZIP, and `SHA256SUMS.txt`.
-- [ ] Run **Prepare release artifacts** and download the SBOM and provenance-bearing artifacts.
-- [ ] Scan the release candidate with Microsoft Defender and at least one independent scanner.
-- [ ] Code-sign the EXE with an Authenticode certificate if available, then rebuild checksums and smoke-test the signed binary.
+- [x] v2.0.0 diff/version reviewed and tagged.
+- [x] Clean Windows tests, production build, EXE smoke, ZIP, and SHA256SUMS completed.
+- [x] SBOM and GitHub provenance generated and published.
+- [x] Public v2.0.0 EXE/ZIP scanned with Microsoft Defender after download.
+- [ ] Authenticode signing remains unavailable; do not claim the executable is signed.
 
 ## GitHub repository metadata
 
-- [ ] Set the description to: `Windows AI CLI Control Center — install, diagnose, repair, and monitor Claude Code and Codex CLI.`
-- [ ] Set the homepage to `https://trafalgardi.github.io/ai-usage-widget/`.
-- [ ] Add topics: `windows`, `claude-code`, `codex-cli`, `ai-tools`, `usage-monitor`, `developer-tools`, `pywebview`.
-- [ ] Enable Discussions if the maintainer wants a support/community channel.
+- [x] Description and homepage configured.
+- [x] Release topics configured.
+- [x] Discussions enabled.
 - [ ] Confirm private vulnerability reporting is enabled.
 
 ## Publish
 
-- [ ] Push the reviewed branch and merge through a pull request.
-- [ ] Tag the reviewed commit and create a GitHub Release using the v2 changelog.
-- [ ] Attach the signed-or-reviewed EXE, ZIP, `SHA256SUMS.txt`, and SBOM; confirm provenance is visible.
-- [ ] Update the website and verify every screenshot/link from the public URL.
-- [ ] Only after the final public release URL and SHA-256 exist, fill a WinGet manifest from `packaging/winget/README.md`, validate it with `winget validate`, and submit to `microsoft/winget-pkgs`.
+- [x] v2.0.0 branch merged, tag and GitHub Release published.
+- [x] EXE, ZIP, SHA256SUMS, SBOM, and provenance published and re-audited.
+- [x] Pages screenshots, README links, latest-release redirect, and downloads verified publicly.
+- [x] v2.0.0 WinGet portable manifest created and passed official `winget validate`.
+- [ ] WinGet submission is blocked until local-manifest install/uninstall behavior is tested in an admin-enabled disposable environment; validation alone is not treated as behavioral proof.
+
+## Next release gate
+
+- [ ] Review final changelog and version metadata together.
+- [ ] Run all unit tests, compileall, link checks, production Windows build, headless EXE smoke, and hidden WebView lifecycle smoke from a clean commit.
+- [ ] Scan the exact release EXE/ZIP with Defender and verify final hashes.
+- [ ] Run the artifact workflow, verify its provenance against the tagged commit, then publish without replacing older assets.
 
 ## Launch
 

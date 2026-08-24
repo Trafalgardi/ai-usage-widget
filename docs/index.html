@@ -7,7 +7,7 @@
   <meta name="description" content="Install, diagnose, repair, and monitor Claude Code and OpenAI Codex CLI from one open-source Windows control center.">
   <link rel="canonical" href="https://trafalgardi.github.io/ai-usage-widget/">
   <meta property="og:title" content="AI CLI Control Center for Windows">
-  <meta property="og:description" content="Provider Health, guided recovery, PATH diagnostics, and usage limits for Claude Code and Codex CLI.">
+  <meta property="og:description" content="Provider Health, guided recovery, private burn-rate forecasts, and usage limits for Claude Code and Codex CLI.">
   <meta property="og:image" content="https://trafalgardi.github.io/ai-usage-widget/assets/control-center-dashboard.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#090d16">
@@ -27,7 +27,7 @@
 <header><div class="wrap">
   <div class="eyebrow">Windows 10 & 11 · Open source · MIT</div>
   <h1>Your Windows control center for AI CLIs.</h1>
-  <p class="lead">Install, diagnose, repair, and monitor Claude Code and OpenAI Codex CLI. Provider Health tells you what Windows found, what is broken, and the safest next action.</p>
+  <p class="lead">Install, diagnose, repair, and monitor Claude Code and OpenAI Codex CLI. Provider Health explains what Windows found and the safest next action; private local history adds conservative burn-rate forecasts without telemetry.</p>
   <div class="actions"><a class="button" href="https://github.com/Trafalgardi/ai-usage-widget/releases/latest">Download for Windows</a><a class="button alt" href="https://github.com/Trafalgardi/ai-usage-widget">View source</a></div>
   <img class="hero" src="assets/control-center-dashboard.png" alt="AI CLI Control Center dashboard for Claude Code and Codex CLI">
 </div></header>
@@ -36,20 +36,24 @@
     <article class="card"><h3>Run</h3><p>Download the portable release, verify its SHA-256, and launch it.</p></article>
     <article class="card"><h3>Detect</h3><p>Provider Health checks the CLI, version, sign-in metadata, and PATH copies.</p></article>
     <article class="card"><h3>Recover</h3><p>Install, refresh a recoverable session, or open the official sign-in flow.</p></article>
-    <article class="card"><h3>Monitor</h3><p>Keep session and weekly limits visible in the app or Windows tray.</p></article>
+    <article class="card"><h3>Monitor</h3><p>Keep limits visible and, after enough samples, see local burn rate and projected exhaustion.</p></article>
   </div></div></section>
   <section><div class="wrap"><h2>Health and recovery, not just quota bars</h2><p class="sub">Installation, authentication, and usage failures are separate signals. A network timeout never becomes an unnecessary login prompt.</p><div class="grid">
     <article class="card"><h3>Windows discovery</h3><p>Find native, standalone, WinGet, npm, and PATH installations; warn about conflicting copies.</p></article>
     <article class="card"><h3>Guided repair</h3><p>Use official provider installers and CLI login commands only after an explicit action.</p></article>
     <article class="card"><h3>Resilient monitoring</h3><p>Classify auth, rate-limit, server, network, and format failures while preserving last-good usage.</p></article>
+    <article class="card"><h3>Private forecasting</h3><p>Store only bounded normalized snapshots, report confidence honestly, and keep alerts opt-in and cooldown-aware.</p></article>
     <article class="card"><h3>Release trust</h3><p>Pinned builds, checksums, smoke tests, SBOM preparation, and provenance-ready CI.</p></article>
   </div></div></section>
   <section><div class="wrap"><h2>Actual application states</h2><div class="screens">
     <img src="assets/provider-health-ready.png" alt="Claude Code Provider Health ready state">
     <img src="assets/provider-cli-missing.png" alt="Claude Code CLI not found with install action">
     <img src="assets/provider-auth-degraded.png" alt="Claude Code expired session with refresh and sign-in actions">
+    <img src="assets/usage-forecast-codex.png" alt="Codex usage burn rate and conservative exhaustion forecast">
+    <img src="assets/privacy-history-settings.png" alt="Local history and opt-in alert settings">
+    <img src="assets/redacted-diagnostics-preview.png" alt="Redacted diagnostics preview and consent flow">
   </div></div></section>
-  <section><div class="wrap"><h2>Privacy you can inspect</h2><div class="trust">No project account, analytics, telemetry, advertising, or project-operated server. Provider credentials are read locally and used only for direct provider usage requests. Tokens are not exposed through Provider Health or sent to this project. Update checks are manual and read-only.</div><p><a href="https://github.com/Trafalgardi/ai-usage-widget/blob/master/PRIVACY.md">Read the exact files and network destinations →</a></p></div></section>
+  <section><div class="wrap"><h2>Privacy you can inspect</h2><div class="trust">No project account, analytics, telemetry, advertising, or project-operated server. Local history contains normalized percentages and UTC/reset timestamps—not tokens, raw API responses, or account identifiers—and can be disabled or cleared. Redacted diagnostics are previewed before copying or opening GitHub. Update checks are manual and read-only.</div><p><a href="https://github.com/Trafalgardi/ai-usage-widget/blob/master/PRIVACY.md">Read the exact files and network destinations →</a></p></div></section>
 </main>
 <footer><div class="wrap">Independent project; not affiliated with Anthropic or OpenAI · <a href="https://github.com/Trafalgardi/ai-usage-widget/blob/master/LICENSE">MIT License</a> · <a href="https://github.com/Trafalgardi/ai-usage-widget/blob/master/SECURITY.md">Security</a></div></footer>
 </body></html>

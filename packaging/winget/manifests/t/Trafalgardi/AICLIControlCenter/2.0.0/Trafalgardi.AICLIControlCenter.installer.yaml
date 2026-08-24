@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
+PackageIdentifier: Trafalgardi.AICLIControlCenter
+PackageVersion: 2.0.0
+InstallerType: portable
+UpgradeBehavior: install
+Commands:
+- AI-CLI-Control-Center
+ReleaseDate: 2026-08-24
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/Trafalgardi/ai-usage-widget/releases/download/v2.0.0/AI-CLI-Control-Center.exe
+  InstallerSha256: 59E9204A97304093CBAA0A8377734047AD437D34FDF29B8DF43E451C937EABD4
+ManifestType: installer
+ManifestVersion: 1.12.0

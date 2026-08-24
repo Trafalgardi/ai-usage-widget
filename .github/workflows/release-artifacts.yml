@@ -13,6 +13,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -33,6 +35,6 @@ jobs:
           subject-path: dist/AI-CLI-Control-Center.exe
       - uses: actions/upload-artifact@v7
         with:
-          name: ai-cli-control-center-v2.0.0
+          name: ai-cli-control-center-v2.1.0
           path: dist/
           if-no-files-found: error
