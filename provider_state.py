@@ -1,0 +1,28 @@
+# -*- coding: utf-8 -*-
+"""Normalized v2 provider-health snapshot aggregation."""
+
+from auth_health import inspect_all_auth, recommended_action
+from provider_health import discover_all
+
+
+HEALTH_SCHEMA_VERSION = 2
+
+
+def collect_provider_health(now=None):
+    cli_by_provider = discover_all()
+    auth_by_provider = inspect_all_auth(now=now)
+
+    providers = {}
+    for provider_id in ("claude", "codex"):
+        cli = cli_by_provider.get(provider_id) or {"state": "unknown"}
+        auth = auth_by_provider.get(provider_id) or {"state": "unknown"}
+        providers[provider_id] = {
+            "cli": cli,
+            "auth": auth,
+            "recommended_action": recommended_action(cli, auth),
+        }
+
+    return {
+        "schema_version": HEALTH_SCHEMA_VERSION,
+        "providers": providers,
+    }
