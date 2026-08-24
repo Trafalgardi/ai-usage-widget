@@ -13,7 +13,7 @@ authors = [{name = "Trafalgardi"}]
 dependencies = [
   "pywebview==5.4",
   "pystray==0.19.5",
-  "Pillow==11.3.0",
+  "Pillow==12.3.0",
 ]
 
 [project.urls]
