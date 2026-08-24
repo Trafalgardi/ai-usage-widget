@@ -24,10 +24,16 @@ class AuthHealthTests(unittest.TestCase):
                 "refreshToken": "refresh",
                 "expiresAt": (now - 60) * 1000,
                 "refreshTokenExpiresAt": (now + 86400) * 1000,
+                "scopes": ["user:profile", "user:inference"],
+                "subscriptionType": "max",
             })],
         ):
             health = auth_health.inspect_claude_auth(now=now)
         self.assertEqual("access_expired_refreshable", health["state"])
+        self.assertEqual(["user:profile", "user:inference"], health["scopes"])
+        self.assertEqual("max", health["subscription_type"])
+        self.assertNotIn("accessToken", health)
+        self.assertNotIn("refreshToken", health)
         self.assertEqual("refresh_session", auth_health.recommended_action(
             {"state": "installed"}, health
         )["id"])

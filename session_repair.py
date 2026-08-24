@@ -69,6 +69,7 @@ def refresh_claude_session(timeout=45):
         try:
             proc = subprocess.run(
                 _command(executable, ["-p", "Reply exactly OK."]),
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

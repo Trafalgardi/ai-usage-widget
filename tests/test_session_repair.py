@@ -40,6 +40,7 @@ class SessionRepairTests(unittest.TestCase):
         command = run.call_args.args[0]
         self.assertEqual(r"C:\Users\me\.local\bin\claude.exe", command[0])
         self.assertEqual(["-p", "Reply exactly OK."], command[1:])
+        self.assertIs(session_repair.subprocess.DEVNULL, run.call_args.kwargs["stdin"])
 
     def test_missing_cli_does_not_launch_probe(self):
         with patch(

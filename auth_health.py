@@ -76,7 +76,10 @@ def _base_auth_result(provider_id):
         "refresh_present": False,
         "access_expires_at": None,
         "refresh_expires_at": None,
+        "scopes": [],
+        "subscription_type": None,
         "metadata_complete": False,
+        "metadata": {},
         "reason": None,
         "error": None,
     }
@@ -113,13 +116,27 @@ def inspect_claude_auth(now=None):
         oauth.get("refreshTokenExpiresAt")
         or oauth.get("refresh_token_expires_at")
     )
+    raw_scopes = oauth.get("scopes") or []
+    if isinstance(raw_scopes, str):
+        scopes = [item for item in raw_scopes.replace(",", " ").split() if item]
+    elif isinstance(raw_scopes, list):
+        scopes = [str(item) for item in raw_scopes if isinstance(item, str)]
+    else:
+        scopes = []
 
     result.update({
         "access_present": bool(access),
         "refresh_present": bool(refresh),
         "access_expires_at": access_exp,
         "refresh_expires_at": refresh_exp,
+        "scopes": scopes,
+        "subscription_type": oauth.get("subscriptionType") or oauth.get("subscription_type"),
         "metadata_complete": bool(access and access_exp),
+        "metadata": {
+            "access_expiry_present": access_exp is not None,
+            "refresh_expiry_present": refresh_exp is not None,
+            "scopes_present": bool(scopes),
+        },
     })
 
     if not access:
@@ -185,6 +202,11 @@ def inspect_codex_auth(now=None):
         "refresh_present": bool(refresh),
         "access_expires_at": access_exp,
         "metadata_complete": bool(access and access_exp),
+        "metadata": {
+            "access_expiry_present": access_exp is not None,
+            "refresh_expiry_present": False,
+            "scopes_present": False,
+        },
     })
 
     if not access:
