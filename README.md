@@ -8,7 +8,7 @@
 
 AI CLI Control Center is an independent, open-source Windows companion for **Claude Code** and **OpenAI Codex CLI**. Provider Health detects whether each CLI is installed and working, checks sign-in metadata, identifies conflicting PATH copies, offers the appropriate recovery action, and keeps usage limits visible in the app and system tray.
 
-**Download:** [latest Windows release](https://github.com/Trafalgardi/ai-usage-widget/releases/latest) · v2 is currently prepared as a release candidate in this branch.
+**Download:** [AI CLI Control Center v2.0.0 for Windows](https://github.com/Trafalgardi/ai-usage-widget/releases/latest)
 
 ![Main dashboard showing Claude Code and Codex CLI](docs/assets/control-center-dashboard.png)
 

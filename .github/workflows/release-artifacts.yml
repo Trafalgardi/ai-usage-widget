@@ -33,6 +33,6 @@ jobs:
           subject-path: dist/AI-CLI-Control-Center.exe
       - uses: actions/upload-artifact@v4
         with:
-          name: release-candidate-v2.0.0
+          name: ai-cli-control-center-v2.0.0
           path: dist/
           if-no-files-found: error
