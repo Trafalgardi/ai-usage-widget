@@ -2,4 +2,4 @@ pywebview==5.4
 pystray==0.19.5
 Pillow==11.3.0
 pyinstaller==6.15.0
-setuptools==80.9.0
+setuptools==84.0.0
