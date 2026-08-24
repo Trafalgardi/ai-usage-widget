@@ -15,22 +15,23 @@ This file is a status record, not an unreviewed list of empty boxes. Detailed pu
 - [x] Description and homepage configured.
 - [x] Release topics configured.
 - [x] Discussions enabled.
-- [ ] Confirm private vulnerability reporting is enabled.
+- [x] Private vulnerability reporting is enabled.
 
 ## Publish
 
 - [x] v2.0.0 branch merged, tag and GitHub Release published.
 - [x] EXE, ZIP, SHA256SUMS, SBOM, and provenance published and re-audited.
 - [x] Pages screenshots, README links, latest-release redirect, and downloads verified publicly.
+- [x] v2.1.0 published from tagged commit `2935460`; public assets, latest redirect, Pages, checksums, packaged smoke, Defender scan, and provenance re-verified.
 - [x] v2.0.0 WinGet portable manifest created and passed official `winget validate`.
 - [ ] WinGet submission is blocked until local-manifest install/uninstall behavior is tested in an admin-enabled disposable environment; validation alone is not treated as behavioral proof.
 
 ## Next release gate
 
-- [ ] Review final changelog and version metadata together.
-- [ ] Run all unit tests, compileall, link checks, production Windows build, headless EXE smoke, and hidden WebView lifecycle smoke from a clean commit.
-- [ ] Scan the exact release EXE/ZIP with Defender and verify final hashes.
-- [ ] Run the artifact workflow, verify its provenance against the tagged commit, then publish without replacing older assets.
+- [x] Final changelog and 2.1.0 version metadata reviewed together.
+- [x] All 54 unit tests, compileall, link checks, production Windows build, headless EXE smoke, and hidden WebView lifecycle smoke passed from the release source.
+- [x] Exact release EXE/ZIP scanned with Defender and final hashes verified.
+- [x] Artifact workflow `32768882064` completed; provenance resolves to tag `v2.1.0` and commit `2935460`; v2.0.0 assets were not replaced.
 
 ## Launch
 
