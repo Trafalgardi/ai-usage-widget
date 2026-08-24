@@ -160,6 +160,9 @@
   .provider-health .health-warning{margin-top:6px}
   .provider-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
   .provider-actions .login-btn{width:auto;flex:1;margin-top:0;min-width:110px;padding:8px 10px}
+  .usage-insight{margin-top:7px;padding:7px 9px;border-radius:7px;background:rgba(128,128,128,.10);
+    font-size:10px;line-height:1.45;opacity:.82}
+  .usage-insight strong{font-weight:700;opacity:1}
 
   .low i{background:#c8452c !important}
   .th-codex .low i{background:#ff5c47 !important}
@@ -194,6 +197,10 @@
   .settings .save-btn:hover{background:#c96747}
   .settings .save-btn:disabled{opacity:.6; cursor:not-allowed}
   .settings .saved-msg{font-size:11px; color:#2ECC40; margin-top:8px; text-align:center}
+  .settings textarea{width:100%;min-height:170px;resize:vertical;padding:9px;background:#111114;color:#d7d7dd;
+    border:1px solid #303036;border-radius:7px;font:10px/1.45 Consolas,monospace;-webkit-user-select:text;user-select:text}
+  .settings .privacy-note{font-size:10px;line-height:1.5;color:#777780;margin-top:7px}
+  .settings .button-row{display:flex;gap:7px}.settings .button-row .save-btn{flex:1}
   
   /* ---------- загрузка ---------- */
   .loading-overlay{
@@ -460,6 +467,23 @@ function pctText(w){
   if(w.remaining_pct == null) return "—";
   return (Math.round(w.remaining_pct*10)/10).toLocaleString(LANG === "en" ? "en-US" : "ru-RU");
 }
+
+function usageInsight(providerId, windowId){
+  return DATA && DATA.insights && DATA.insights.analytics &&
+    DATA.insights.analytics[providerId] && DATA.insights.analytics[providerId][windowId];
+}
+
+function fmtInsight(value){
+  if(!value || value.state !== "available") return "";
+  const burn = Number(value.burn_pct_per_hour || 0).toFixed(1);
+  let forecast = "On pace through reset";
+  if(value.pace_state === "at_risk" && value.projected_exhaustion_at){
+    forecast = `May exhaust ${fmtCountdown(value.projected_exhaustion_at).replace("−", "in ")}`;
+  }else if(value.pace_state === "stable"){
+    forecast = "Usage stable in the observed period";
+  }
+  return `<div class="usage-insight"><strong>${burn}%/hour</strong> burn · ${esc(forecast)} · ${esc(value.confidence)} confidence</div>`;
+}
 function asciiBar(pctRemaining, width=18){
   if(pctRemaining == null) return "";
   const on = Math.round(width * pctRemaining / 100);
@@ -543,6 +567,7 @@ function renderDetail(id){
         <span>${t("resetsIn")} ${fmtCountdown(w.resets_at)}</span>
         <span>${fmtClock(w.resets_at)}</span></div>`;
     }
+    html += fmtInsight(usageInsight(id, w.id));
     html += `</div>`;
   }
 
@@ -737,6 +762,26 @@ function renderSettings(){
         <div class="saved-msg" id="update-result" style="display:none"></div>
         <div class="meta" style="margin-top:8px">Version ${esc(DATA.app_version || "development")} · Update checks contact GitHub only when requested.</div>
       </div>
+      <div class="section">
+        <div class="section-title">Private local history</div>
+        <div class="toggle-row"><label>Store normalized usage snapshots locally</label><label class="switch"><input type="checkbox" id="cfg-history" ${cfg.history?.enabled !== false ? 'checked' : ''}><span class="slider"></span></label></div>
+        <div class="field"><label>Retention (days)</label><input type="number" id="cfg-retention" value="${cfg.history?.retention_days || 30}" min="1" max="365"></div>
+        <div class="toggle-row"><label>Smart local alerts (opt in)</label><label class="switch"><input type="checkbox" id="cfg-alerts" ${cfg.alerts?.enabled ? 'checked' : ''}><span class="slider"></span></label></div>
+        <div class="field"><label>Low remaining threshold (%)</label><input type="number" id="cfg-alert-threshold" value="${cfg.alerts?.remaining_threshold_pct || 15}" min="1" max="50"></div>
+        <div class="privacy-note">History contains only provider/window keys, timestamps, reset times, and percentages. It never stores tokens, account identifiers, or raw provider responses. Forecasts need multiple comparable samples.</div>
+        <button class="save-btn" id="btn-clear-history">Clear local history</button>
+        <div class="saved-msg" id="history-result" style="display:none"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">Support</div>
+        <div class="privacy-note">Preview the allow-listed diagnostics before copying or opening GitHub. No report is sent automatically.</div>
+        <button class="save-btn" id="btn-preview-diagnostics">Preview redacted diagnostics</button>
+        <div id="diagnostics-preview" style="display:none;margin-top:8px">
+          <textarea id="diagnostics-text" readonly></textarea>
+          <div class="button-row"><button class="save-btn" id="btn-copy-diagnostics">Copy diagnostics</button><button class="save-btn" id="btn-open-issue">Open issue</button></div>
+          <div class="saved-msg" id="diagnostics-result" style="display:none"></div>
+        </div>
+      </div>
       <button class="save-btn" id="btn-save-settings">${t("save")}</button>
       <div class="saved-msg" id="saved-msg" style="display:none">${t("saved")}</div>
     </div>
@@ -751,7 +796,9 @@ function renderSettings(){
         width: parseInt($("#cfg-width").value) || 380,
         height: parseInt($("#cfg-height").value) || 600,
         on_top: $("#cfg-ontop").checked,
-      }
+      },
+      history: {enabled: $("#cfg-history").checked, retention_days: parseInt($("#cfg-retention").value) || 30},
+      alerts: {enabled: $("#cfg-alerts").checked, remaining_threshold_pct: parseInt($("#cfg-alert-threshold").value) || 15, cooldown_sec: cfg.alerts?.cooldown_sec || 3600},
     };
     const ok = await window.pywebview.api.save_config_api(newCfg);
     if(ok === true){
@@ -787,6 +834,29 @@ function renderSettings(){
     output.textContent = result.status === "update_available"
       ? `Version ${result.latest_version} is available on GitHub Releases.`
       : result.status === "up_to_date" ? "You are up to date." : "Update check failed. Try again later.";
+  });
+  $("#btn-clear-history")?.addEventListener("click", async () => {
+    const output = $("#history-result");
+    const result = await window.pywebview.api.clear_history();
+    output.style.display = "block";
+    output.textContent = result.success ? "Local history cleared." : "Could not clear local history.";
+  });
+  $("#btn-preview-diagnostics")?.addEventListener("click", async () => {
+    const result = await window.pywebview.api.get_diagnostics_preview();
+    $("#diagnostics-preview").style.display = "block";
+    $("#diagnostics-text").value = result.success ? result.text : "Diagnostics unavailable.";
+  });
+  $("#btn-copy-diagnostics")?.addEventListener("click", async () => {
+    const text = $("#diagnostics-text").value;
+    try{ await navigator.clipboard.writeText(text); }
+    catch(e){ $("#diagnostics-text").select(); document.execCommand("copy"); }
+    const output = $("#diagnostics-result"); output.style.display = "block"; output.textContent = "Diagnostics copied.";
+  });
+  $("#btn-open-issue")?.addEventListener("click", async () => {
+    const output = $("#diagnostics-result"); output.style.display = "block";
+    output.textContent = "Opening GitHub with a fresh redacted diagnostics block…";
+    const result = await window.pywebview.api.open_issue_with_diagnostics();
+    output.textContent = result.success ? "GitHub issue form opened. Review it before submitting." : "Could not open the browser.";
   });
 }
 
@@ -897,7 +967,7 @@ setTimeout(() => {
   const demo = new URLSearchParams(location.search).get("demo") || "ready";
   const missing = demo === "missing";
   const degraded = demo === "degraded";
-  DATA = {contract_version:1,app_version:"2.0.0",startup:{supported:true,enabled:false},_config:{language:"en",refresh_interval_sec:60,window:{width:380,height:600,on_top:true}},updated_at: Date.now()/1000, providers: {
+  DATA = {contract_version:1,app_version:"2.1.0",startup:{supported:true,enabled:false},_config:{language:"en",refresh_interval_sec:60,window:{width:380,height:600,on_top:true},history:{enabled:true,retention_days:30},alerts:{enabled:false,remaining_threshold_pct:15,cooldown_sec:3600}},updated_at: Date.now()/1000, providers: {
     claude:{id:"claude",name:"Claude Code",ok:true,meta:{subscription:"max"},windows:[
       {id:"session",label:"Сессия (5 ч)",remaining_pct:64,resets_at:Date.now()/1000+7620},
       {id:"week",label:"Неделя",remaining_pct:41,resets_at:Date.now()/1000+3600*52},
@@ -905,7 +975,7 @@ setTimeout(() => {
     codex:{id:"codex",name:"Codex CLI",ok:true,meta:{plan:"plus"},windows:[
       {id:"session",label:"Сессия (5 ч)",remaining_pct:73,resets_at:Date.now()/1000+4980},
       {id:"week",label:"Неделя",remaining_pct:12,resets_at:Date.now()/1000+3600*30}]},
-  },provider_health:{schema_version:2,providers:{
+  },insights:{enabled:true,snapshot_count:42,alerts:[],analytics:{claude:{session:{state:"available",confidence:"medium",burn_pct_per_hour:7.4,pace_state:"sustainable"}},codex:{session:{state:"available",confidence:"high",burn_pct_per_hour:18.2,pace_state:"at_risk",projected_exhaustion_at:Date.now()/1000+3900}}}},provider_health:{schema_version:2,providers:{
     claude:{cli:{state:missing?"missing":"installed",version:missing?null:"2.1.226",install_method:"native",path_conflict:false},auth:{state:degraded?"access_expired_refreshable":(missing?"missing_credentials":"valid")},usage:{state:"available",stale:false},actions:missing?[{id:"install",label_key:"install_cli"}]:(degraded?[{id:"refresh_session",label_key:"refresh_session"},{id:"login",label_key:"sign_in_again"}]:[])},
     codex:{cli:{state:"installed",version:"codex-cli 1.2.0",install_method:"standalone",path_conflict:false},auth:{state:"valid"},usage:{state:"available",stale:false},actions:[]}
   }}};
@@ -914,6 +984,12 @@ setTimeout(() => {
   renderAll();
   const screen = new URLSearchParams(location.search).get("screen");
   if(screen === "claude" || screen === "codex" || screen === "settings") showPage(screen);
+  if(demo === "diagnostics"){
+    const panel = $("#diagnostics-preview");
+    if(panel) panel.style.display = "block";
+    const text = $("#diagnostics-text");
+    if(text) text.value = `AI CLI Control Center diagnostics (redacted)\n{\n  "app": {"version": "2.1.0"},\n  "os": {"system": "Windows", "release": "11", "architecture": "AMD64"},\n  "providers": {\n    "claude": {"discovery_status": "installed", "cli_version": "2.1.226", "path_conflict_category": "none"},\n    "codex": {"discovery_status": "installed", "cli_version": "codex-cli 1.2.0", "path_conflict_category": "none"}\n  }\n}`;
+  }
 }, 800);
 </script>
 </body>

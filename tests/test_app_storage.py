@@ -26,6 +26,19 @@ class ConfigStoreTests(unittest.TestCase):
                 self.assertEqual(90, json.load(stream)["refresh_interval_sec"])
             self.assertFalse(os.path.exists(path + ".tmp"))
 
+    def test_valid_legacy_config_is_copied_once_without_deleting_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legacy = os.path.join(directory, "legacy.json")
+            current = os.path.join(directory, "new", "config.json")
+            with open(legacy, "w", encoding="utf-8") as stream:
+                json.dump({"language": "en", "window": {"width": 512}}, stream)
+            store = ConfigStore(current, {"language": "ru", "window": {"width": 380, "height": 600}})
+            self.assertTrue(store.migrate_from(legacy))
+            self.assertTrue(os.path.exists(legacy))
+            self.assertEqual(512, store.load()["window"]["width"])
+            self.assertEqual(600, store.load()["window"]["height"])
+            self.assertFalse(store.migrate_from(legacy))
+
 
 if __name__ == "__main__":
     unittest.main()

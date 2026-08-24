@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$Executable,
-    [switch]$Headless
+    [switch]$Headless,
+    [string]$ExpectedVersion = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,7 +10,7 @@ $ResolvedExecutable = (Resolve-Path -LiteralPath $Executable).Path
 $File = Get-Item -LiteralPath $ResolvedExecutable
 if ($File.Length -lt 1MB) { throw "Executable is unexpectedly small: $($File.Length) bytes" }
 $Version = $File.VersionInfo.ProductVersion
-if (-not $Version.StartsWith("2.0.0")) { throw "Unexpected product version: $Version" }
+if ($ExpectedVersion -and -not $Version.StartsWith($ExpectedVersion)) { throw "Unexpected product version: $Version (expected $ExpectedVersion)" }
 
 $SmokeVariable = if ($Headless) { "AI_CLI_CONTROL_CENTER_SMOKE_TEST" } else { "AI_CLI_CONTROL_CENTER_UI_SMOKE_TEST" }
 Set-Item -Path "Env:$SmokeVariable" -Value "1"

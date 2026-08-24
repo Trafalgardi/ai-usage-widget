@@ -4,9 +4,12 @@
 import copy
 import threading
 import time
+import urllib.parse
+import webbrowser
 
 import widget as legacy_widget
 from auth_health import recommended_actions
+from diagnostics import build_diagnostics, format_diagnostics
 from error_model import ErrorKind, exception_error
 from provider_actions import install_provider, login_provider
 from provider_registry import ActionId, PROVIDERS
@@ -121,6 +124,28 @@ class ControlCenterApi(legacy_widget.JsApi):
 
     def check_for_updates(self):
         return check_for_updates()
+
+    def get_diagnostics_preview(self):
+        try:
+            snap = legacy_widget.JsApi.get_data(self)
+            value = build_diagnostics(__version__, self._provider_health(), snap.get("providers"), time.time())
+            return {"success": True, "diagnostics": value, "text": format_diagnostics(value)}
+        except Exception as exc:
+            return {"success": False, "status": "diagnostics_failed", "error": exception_error(
+                "diagnostics_failed", ErrorKind.INTERNAL, exc, retryable=True
+            )}
+
+    def open_issue_with_diagnostics(self):
+        preview = self.get_diagnostics_preview()
+        if not preview.get("success"):
+            return preview
+        query = urllib.parse.urlencode({
+            "title": "[Diagnostics] ",
+            "body": "## What happened?\n\n<!-- Describe the problem. -->\n\n## Redacted diagnostics\n\n```json\n" +
+                    preview["text"] + "\n```\n",
+        })
+        url = "https://github.com/Trafalgardi/ai-usage-widget/issues/new?" + query
+        return {"success": bool(webbrowser.open(url)), "status": "issue_opened", "url": url}
 
 
 V2JsApi = ControlCenterApi

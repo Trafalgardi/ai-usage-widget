@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+
+PackageIdentifier: Trafalgardi.AICLIControlCenter
+PackageVersion: 2.0.0
+PackageLocale: en-US
+Publisher: Trafalgardi
+PublisherUrl: https://github.com/Trafalgardi
+PublisherSupportUrl: https://github.com/Trafalgardi/ai-usage-widget/issues
+Author: Trafalgardi
+PackageName: AI CLI Control Center
+PackageUrl: https://trafalgardi.github.io/ai-usage-widget/
+License: MIT
+LicenseUrl: https://github.com/Trafalgardi/ai-usage-widget/blob/v2.0.0/LICENSE
+Copyright: Copyright (c) 2026 Trafalgardi
+ShortDescription: Local Windows control center for Claude Code and Codex CLI health and usage limits.
+Description: AI CLI Control Center is a privacy-first Windows dashboard for discovering, diagnosing, repairing, and monitoring Claude Code and Codex CLI. This package installs the release EXE as a WinGet-managed portable application; it is not an MSI and does not create Start menu integration itself.
+Moniker: ai-cli-control-center
+Tags:
+- ai
+- claude
+- cli
+- codex
+- developer-tools
+- local-first
+- usage-limits
+- windows
+ReleaseNotesUrl: https://github.com/Trafalgardi/ai-usage-widget/releases/tag/v2.0.0
+ManifestType: defaultLocale
+ManifestVersion: 1.12.0

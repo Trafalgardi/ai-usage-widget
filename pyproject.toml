@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-cli-control-center"
-version = "2.0.0"
+version = "2.1.0"
 description = "Windows control center for installing, diagnosing, repairing, and monitoring Claude Code and Codex CLI"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -25,7 +25,7 @@ Issues = "https://github.com/Trafalgardi/ai-usage-widget/issues"
 py-modules = [
   "app_storage", "application", "auth_health", "error_model", "process_runner",
   "provider_actions", "provider_health", "provider_registry", "provider_state",
-  "session_repair", "ui_bridge", "ui_contract", "update_service", "usage_health",
+  "diagnostics", "session_repair", "ui_bridge", "ui_contract", "update_service", "usage_health", "usage_history",
   "version", "widget", "widget_v2", "windows_integration",
 ]
 

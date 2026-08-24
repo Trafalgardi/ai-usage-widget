@@ -7,6 +7,9 @@ on:
       - v2/provider-health
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   unit-tests:
     strategy:
@@ -15,6 +18,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -29,6 +34,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -42,6 +49,6 @@ jobs:
           name: ai-cli-control-center-windows
           path: |
             dist/AI-CLI-Control-Center.exe
-            dist/AI-CLI-Control-Center-v2.0.0-windows-x64.zip
+            dist/AI-CLI-Control-Center-v2.1.0-windows-x64.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error

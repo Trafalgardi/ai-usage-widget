@@ -8,7 +8,7 @@
 
 AI CLI Control Center is an independent, open-source Windows companion for **Claude Code** and **OpenAI Codex CLI**. Provider Health detects whether each CLI is installed and working, checks sign-in metadata, identifies conflicting PATH copies, offers the appropriate recovery action, and keeps usage limits visible in the app and system tray.
 
-**Download:** [AI CLI Control Center v2.0.0 for Windows](https://github.com/Trafalgardi/ai-usage-widget/releases/latest)
+**Download:** [Latest AI CLI Control Center for Windows](https://github.com/Trafalgardi/ai-usage-widget/releases/latest)
 
 ![Main dashboard showing Claude Code and Codex CLI](docs/assets/control-center-dashboard.png)
 
@@ -33,8 +33,21 @@ No separate project account is required. Windows may show a SmartScreen warning 
 | Refresh an expired but recoverable session | User-triggered CLI probe | Sign in through Codex CLI |
 | Session and weekly usage limits | Yes, when endpoint data is available | Yes, when endpoint data is available |
 | Stale last-good usage during temporary failures | Yes | Yes |
+| Private local history and burn rate | Yes | Yes |
+| Conservative limit forecast | Yes | Yes |
+| Opt-in cooldown-aware local alerts | Yes | Yes |
 
 ![Claude Provider Health ready state](docs/assets/provider-health-ready.png)
+
+## Daily usage intelligence, kept local
+
+Successful refreshes can add a small normalized snapshot to a bounded local history. After enough comparable samples, provider cards show burn rate, pace to reset, forecast confidence, and projected exhaustion only when the evidence supports it. A single sample is reported as unavailable rather than turned into a guess.
+
+![Codex burn rate and forecast alongside Provider Health](docs/assets/usage-forecast-codex.png)
+
+History can be disabled or cleared at any time. Smart alerts are separately opt-in, deduplicated by limit/reset cycle, and protected by a configurable cooldown.
+
+![Private history and opt-in alert controls](docs/assets/privacy-history-settings.png)
 
 ## Provider Health and recovery
 
@@ -69,6 +82,11 @@ The app has no analytics, telemetry, advertising, project-operated backend, or a
 - Claude usage: `api.anthropic.com/api/oauth/usage` (with the existing `claude.ai` fallback)
 - Codex usage: `chatgpt.com/backend-api/wham/usage`
 - Manual update check: GitHub Releases API; it does not download or replace the executable
+- Local history: normalized percentages and UTC/reset timestamps only; no tokens, raw responses, or account identifiers
+
+Support diagnostics are allow-listed and previewed before copying or opening GitHub. The preview contains status categories and versions, not full home paths, usernames, raw auth/config, or token values.
+
+![Preview and consent flow for redacted diagnostics](docs/assets/redacted-diagnostics-preview.png)
 
 See [PRIVACY.md](PRIVACY.md) for exact local files, registry changes, and network destinations, and [SECURITY.md](SECURITY.md) for reporting and security boundaries. This project is independent and is not affiliated with Anthropic or OpenAI.
 
@@ -120,6 +138,8 @@ Key modules:
 - `application.py` — composition root
 - `provider_registry.py` — supported provider and action definitions
 - `provider_health.py` / `auth_health.py` / `usage_health.py` — separate health signals
+- `usage_history.py` — local bounded snapshots, forecasts, and alert cooldowns
+- `diagnostics.py` — allow-listed support diagnostics
 - `process_runner.py` — normalized, non-shell process execution
 - `ui_contract.py` / `ui_bridge.py` — typed versioned WebView boundary
 - `windows_integration.py` / `update_service.py` — startup and read-only update discovery
@@ -133,7 +153,7 @@ Key modules:
 The script creates an isolated `.venv-build`, installs pinned dependencies, runs all tests, builds with the checked-in PyInstaller spec, smoke-starts the EXE, and creates:
 
 - `dist/AI-CLI-Control-Center.exe`
-- `dist/AI-CLI-Control-Center-v2.0.0-windows-x64.zip`
+- `dist/AI-CLI-Control-Center-v2.1.0-windows-x64.zip`
 - `dist/SHA256SUMS.txt`
 
 CI performs the same Windows build. The manual release-artifact workflow also creates a CycloneDX SBOM and GitHub build-provenance attestation; it does not publish a GitHub Release.
