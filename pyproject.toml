@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools==80.9.0"]
+requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -11,9 +11,9 @@ requires-python = ">=3.10,<3.14"
 license = "MIT"
 authors = [{name = "Trafalgardi"}]
 dependencies = [
-  "pywebview==5.4",
+  "pywebview==6.2.1",
   "pystray==0.19.5",
-  "Pillow==11.3.0",
+  "Pillow==12.3.0",
 ]
 
 [project.urls]

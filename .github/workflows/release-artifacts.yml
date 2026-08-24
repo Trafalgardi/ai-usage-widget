@@ -12,8 +12,8 @@ jobs:
   prepare:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -28,10 +28,10 @@ jobs:
           format: cyclonedx-json
           output-file: dist/sbom.cdx.json
       - name: Attest executable provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/AI-CLI-Control-Center.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ai-cli-control-center-v2.0.0
           path: dist/
