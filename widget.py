@@ -545,13 +545,16 @@ class TrayManager:
         result = {}
         for pid in ["claude", "codex"]:
             p = snap["providers"].get(pid)
-            if p and p.get("ok"):
+            has_usage = p and (p.get("ok") or (p.get("usage") or {}).get("stale"))
+            if has_usage:
                 w = next((x for x in p.get("windows", []) if x["id"] == "session"), None)
                 if w and w.get("remaining_pct") is not None:
                     result[pid] = round(w["remaining_pct"], 1)
         return result
 
     def _update_icon_with_data(self):
+        if not TRAY_AVAILABLE:
+            return
         pcts = self._get_session_pcts()
         providers = {"claude": "Claude Code", "codex": "Codex CLI"}
         icon_attrs = {"claude": "icon_claude", "codex": "icon_codex"}
@@ -613,10 +616,7 @@ class TrayManager:
             self.icon_codex = icon
             self._thread_codex = t
 
-    def start(self, window):
-        if not TRAY_AVAILABLE:
-            return
-        self.window_ref = window
+    def _build_tooltip(self):
         with STATE.lock:
             snap = copy.deepcopy(STATE.snapshot)
         if not snap.get("updated_at"):
@@ -624,7 +624,8 @@ class TrayManager:
         lines = ["AI Usage Widget"]
         for pid, pname in [("claude", "Claude"), ("codex", "Codex")]:
             p = snap["providers"].get(pid)
-            if not p or not p.get("ok"):
+            has_usage = p and (p.get("ok") or (p.get("usage") or {}).get("stale"))
+            if not has_usage:
                 lines.append(f"{pname}: —")
                 continue
             w = next((x for x in p.get("windows", []) if x["id"] == "session"), None)
