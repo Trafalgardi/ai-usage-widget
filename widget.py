@@ -25,6 +25,8 @@ import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
+from usage_health import LastGoodUsageStore, classify_exception, usage_error
+
 try:
     import pystray
     from PIL import Image, ImageDraw, ImageFont
@@ -196,10 +198,12 @@ def fetch_claude():
             break
         except urllib.error.HTTPError as e:
             last_err = f"HTTP {e.code} от {url}"
+            result["usage"] = classify_exception(e)
             if e.code in (401, 403):
-                last_err += " — токен истёк, зайди в Claude Code (/login)"
+                last_err += " — сессию не удалось подтвердить"
         except Exception as e:
             last_err = f"{type(e).__name__}: {e}"
+            result["usage"] = classify_exception(e)
     if data is None:
         result["error"] = last_err or "Нет ответа от API"
         return result
@@ -229,6 +233,7 @@ def fetch_claude():
         result["ok"] = True
     else:
         result["error"] = "API ответил, но формат не распознан"
+        result["usage"] = usage_error("format", result["error"])
         result["meta"]["raw_keys"] = list(data.keys())[:12]
     return result
 
@@ -298,11 +303,13 @@ def fetch_codex():
     except urllib.error.HTTPError as e:
         msg = f"HTTP {e.code}"
         if e.code in (401, 403):
-            msg += " — токен истёк. Запусти Codex (он обновит токен) или `codex login`."
+            msg += " — сессию не удалось подтвердить"
         result["error"] = msg
+        result["usage"] = classify_exception(e)
         return result
     except Exception as e:
         result["error"] = f"{type(e).__name__}: {e}"
+        result["usage"] = classify_exception(e)
         return result
 
     if isinstance(data.get("plan_type"), str):
@@ -356,6 +363,7 @@ def fetch_codex():
         result["ok"] = True
     else:
         result["error"] = "API ответил, но лимиты не найдены"
+        result["usage"] = usage_error("format", result["error"])
         result["meta"]["raw_keys"] = list(data.keys())[:12]
     return result
 
@@ -677,6 +685,7 @@ class TrayManager:
 
 
 TRAY = TrayManager()
+LAST_GOOD_USAGE = LastGoodUsageStore()
 
 
 def refresh_all():
@@ -692,11 +701,15 @@ def refresh_all():
             for future in as_completed(futures):
                 name = futures[future]
                 try:
-                    providers[name] = future.result()
-                except Exception:
-                    providers[name] = {"id": name, "name": name, "ok": False,
-                                       "windows": [], "meta": {},
-                                       "error": "Внутренняя ошибка:\n" + traceback.format_exc(limit=2)}
+                    provider = future.result()
+                except Exception as exc:
+                    provider = {"id": name, "name": name, "ok": False,
+                                "windows": [], "meta": {},
+                                "error": "Внутренняя ошибка:\n" + traceback.format_exc(limit=2),
+                                "usage": usage_error(
+                                    "unknown", f"{type(exc).__name__}: {exc}"
+                                )}
+                providers[name] = LAST_GOOD_USAGE.apply(provider)
         with STATE.lock:
             STATE.snapshot = {"updated_at": time.time(), "providers": providers}
         TRAY.update_tooltip()

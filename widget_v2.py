@@ -6,10 +6,12 @@ legacy widget.py. This file can be removed once widget.py is split into the v2
 application modules.
 """
 
+import copy
 import threading
 import time
 
 import widget as legacy_widget
+from auth_health import recommended_actions
 from provider_actions import install_provider as run_install_provider
 from provider_actions import login_provider
 from provider_state import collect_provider_health
@@ -32,10 +34,12 @@ V2_UI_PATCH = r"""
   document.head.appendChild(style);
 
   function actionLabel(action, id){
+    const actionId = action && action.id ? action.id : action;
     const en = (typeof LANG !== "undefined" ? LANG : "ru") === "en";
-    if(action === "install") return en ? `Install ${id === "claude" ? "Claude Code" : "Codex CLI"}` : `Установить ${id === "claude" ? "Claude Code" : "Codex CLI"}`;
-    if(action === "refresh_session") return en ? "Refresh session" : "Обновить сессию";
-    if(action === "login") return en ? "Sign in" : "Войти";
+    if(actionId === "install") return en ? `Install ${id === "claude" ? "Claude Code" : "Codex CLI"}` : `Установить ${id === "claude" ? "Claude Code" : "Codex CLI"}`;
+    if(actionId === "refresh_session") return en ? "Refresh session" : "Обновить сессию";
+    if(actionId === "login") return action && action.label_key === "sign_in_again" ? (en ? "Sign in again" : "Войти заново") : (en ? "Sign in" : "Войти");
+    if(actionId === "retry") return en ? "Retry" : "Повторить";
     return null;
   }
 
@@ -52,14 +56,7 @@ V2_UI_PATCH = r"""
     const original = button.textContent;
     button.textContent = (typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Working…" : "Выполняется…";
     try{
-      let result;
-      if(action === "install"){
-        result = await window.pywebview.api.install_provider(id);
-      }else if(action === "refresh_session"){
-        result = await window.pywebview.api.refresh_provider_session(id);
-      }else{
-        return;
-      }
+      const result = await window.pywebview.api.execute_provider_action(id, action);
 
       if(result && result.success){
         button.textContent = (typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Done" : "Готово";
@@ -90,15 +87,12 @@ V2_UI_PATCH = r"""
     if(!detail) return;
 
     const cli = providerHealth.cli || {};
-    const recommended = providerHealth.recommended_action;
-    const action = recommended && recommended.id;
+    const usage = providerHealth.usage || {};
+    const actions = providerHealth.actions || [];
 
     // Legacy UI offers Login for any provider error. Structured health owns the action in v2.
     const legacyLogin = detail.querySelector(".login-btn");
-    if(legacyLogin && action !== "login") legacyLogin.remove();
-    if(legacyLogin && action === "login"){
-      legacyLogin.textContent = actionLabel("login", id);
-    }
+    if(legacyLogin) legacyLogin.remove();
 
     const health = document.createElement("div");
     health.className = "v2-health";
@@ -107,15 +101,19 @@ V2_UI_PATCH = r"""
     const conflict = cli.path_conflict
       ? `<div class="warn">${(typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Multiple CLI installations detected; PATH may select an old copy." : "Найдено несколько установок CLI; PATH может запускать старую копию."}</div>`
       : "";
-    health.innerHTML = `<strong>${statusLabel(cli)}</strong>${version}${method}${conflict}`;
+    const stale = usage.stale
+      ? `<div class="warn">${(typeof LANG !== "undefined" ? LANG : "ru") === "en" ? "Usage temporarily unavailable; showing the last successful update." : "Usage временно недоступен; показаны последние успешные данные."}</div>`
+      : "";
+    health.innerHTML = `<strong>${statusLabel(cli)}</strong>${version}${method}${conflict}${stale}`;
     detail.appendChild(health);
 
-    const label = actionLabel(action, id);
-    if(label && action !== "login"){
+    for(const action of actions){
+      const label = actionLabel(action, id);
+      if(!label) continue;
       const button = document.createElement("button");
       button.className = "login-btn v2-action";
       button.textContent = label;
-      button.addEventListener("click", () => runAction(id, action, button));
+      button.addEventListener("click", () => runAction(id, action.id, button));
       detail.appendChild(button);
     }
   };
@@ -154,7 +152,21 @@ class V2JsApi(legacy_widget.JsApi):
     def get_data(self):
         snap = super().get_data()
         try:
-            snap["provider_health"] = self._provider_health()
+            health = copy.deepcopy(self._provider_health())
+            for provider_id, provider in (snap.get("providers") or {}).items():
+                provider_health = (health.get("providers") or {}).get(provider_id)
+                if not provider_health:
+                    continue
+                usage = copy.deepcopy(provider.get("usage") or {
+                    "state": "unknown", "stale": False, "last_success_at": None
+                })
+                provider_health["usage"] = usage
+                actions = recommended_actions(
+                    provider_health.get("cli"), provider_health.get("auth"), usage
+                )
+                provider_health["actions"] = actions
+                provider_health["recommended_action"] = actions[0] if actions else None
+            snap["provider_health"] = health
         except Exception as exc:
             snap["provider_health"] = {
                 "schema_version": 2,
@@ -162,6 +174,28 @@ class V2JsApi(legacy_widget.JsApi):
                 "error": f"{type(exc).__name__}: {exc}",
             }
         return snap
+
+    def get_token_status(self):
+        """Backward-compatible badge state derived from structured auth health."""
+        health = self._provider_health()
+        result = {"claude": None, "codex": None}
+        for provider_id in result:
+            auth = ((health.get("providers") or {}).get(provider_id) or {}).get("auth") or {}
+            state = auth.get("state")
+            if state == "valid":
+                status = "valid"
+            elif state == "expiring":
+                status = "expiring"
+            elif state in ("access_expired_refreshable", "access_missing_refreshable"):
+                status = "expired"
+            else:
+                continue
+            expires_at = auth.get("access_expires_at")
+            result[provider_id] = {
+                "status": status,
+                "remaining": max(0, expires_at - time.time()) if expires_at else None,
+            }
+        return result
 
     def get_provider_health(self):
         try:
@@ -186,6 +220,24 @@ class V2JsApi(legacy_widget.JsApi):
                 "provider_id": provider_id,
             }
         result = refresh_claude_session()
+        self._invalidate_health()
+        return result
+
+    def execute_provider_action(self, provider_id, action_id):
+        """Dispatch only backend-declared, explicitly allowlisted actions."""
+        if provider_id not in ("claude", "codex"):
+            return {"success": False, "status": "unsupported_provider"}
+        if action_id == "install":
+            result = run_install_provider(provider_id)
+        elif action_id == "refresh_session" and provider_id == "claude":
+            result = refresh_claude_session()
+        elif action_id == "login":
+            result = login_provider(provider_id)
+        elif action_id == "retry":
+            started = self.refresh_now()
+            result = {"success": bool(started), "status": "refresh_started" if started else "refresh_running"}
+        else:
+            return {"success": False, "status": "unsupported_action"}
         self._invalidate_health()
         return result
 

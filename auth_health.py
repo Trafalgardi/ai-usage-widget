@@ -222,26 +222,45 @@ def inspect_all_auth(now=None):
     }
 
 
-def recommended_action(cli_health, auth_health):
+def recommended_actions(cli_health, auth_health, usage_health=None):
     cli_state = (cli_health or {}).get("state")
     auth_state = (auth_health or {}).get("state")
+    usage_state = (usage_health or {}).get("state")
 
     if cli_state == "missing":
-        return {"id": "install", "reason": "cli_missing"}
+        return [{"id": "install", "reason": "cli_missing", "kind": "primary",
+                 "label_key": "install_cli"}]
     if cli_state == "broken":
-        return {"id": "diagnostics", "reason": "cli_probe_failed"}
+        return [{"id": "diagnostics", "reason": "cli_probe_failed", "kind": "primary",
+                 "label_key": "show_diagnostics"}]
 
     if auth_state in ("missing_credentials", "login_required"):
-        return {"id": "login", "reason": auth_state}
+        return [{"id": "login", "reason": auth_state, "kind": "primary",
+                 "label_key": "sign_in"}]
     if auth_state in (
         "access_missing_refreshable",
         "access_expired_refreshable",
         "session_present_metadata_incomplete",
     ):
-        return {"id": "refresh_session", "reason": auth_state}
+        return [
+            {"id": "refresh_session", "reason": auth_state, "kind": "primary",
+             "label_key": "refresh_session"},
+            {"id": "login", "reason": "refresh_fallback", "kind": "secondary",
+             "label_key": "sign_in_again"},
+        ]
     if auth_state == "credentials_broken":
-        return {"id": "repair_auth", "reason": auth_state}
-    if auth_state in ("valid", "expiring"):
-        return None
+        return [{"id": "login", "reason": auth_state, "kind": "primary",
+                 "label_key": "sign_in_again"}]
+    if auth_state not in ("valid", "expiring"):
+        return [{"id": "retry", "reason": auth_state or "unknown", "kind": "primary",
+                 "label_key": "retry"}]
 
-    return {"id": "retry", "reason": auth_state or "unknown"}
+    if usage_state in ("network_error", "server_error", "unsupported_response", "unknown_error"):
+        return [{"id": "retry", "reason": usage_state, "kind": "primary",
+                 "label_key": "retry"}]
+    return []
+
+
+def recommended_action(cli_health, auth_health, usage_health=None):
+    actions = recommended_actions(cli_health, auth_health, usage_health)
+    return actions[0] if actions else None

@@ -31,6 +31,12 @@ class AuthHealthTests(unittest.TestCase):
         self.assertEqual("refresh_session", auth_health.recommended_action(
             {"state": "installed"}, health
         )["id"])
+        self.assertEqual(
+            ["refresh_session", "login"],
+            [a["id"] for a in auth_health.recommended_actions(
+                {"state": "installed"}, health
+            )],
+        )
 
     def test_claude_missing_cli_wins_over_auth(self):
         action = auth_health.recommended_action(
@@ -69,6 +75,22 @@ class AuthHealthTests(unittest.TestCase):
         self.assertEqual("login", auth_health.recommended_action(
             {"state": "installed"}, health
         )["id"])
+
+    def test_network_error_offers_retry_not_login(self):
+        actions = auth_health.recommended_actions(
+            {"state": "installed"},
+            {"state": "valid"},
+            {"state": "network_error"},
+        )
+        self.assertEqual(["retry"], [action["id"] for action in actions])
+
+    def test_rate_limit_does_not_offer_login(self):
+        actions = auth_health.recommended_actions(
+            {"state": "installed"},
+            {"state": "valid"},
+            {"state": "rate_limited"},
+        )
+        self.assertEqual([], actions)
 
 
 if __name__ == "__main__":
