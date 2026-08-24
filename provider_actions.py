@@ -9,31 +9,13 @@ import os
 import shutil
 import subprocess
 
+from error_model import redact_text
 from provider_health import discover_cli
+from provider_registry import PROVIDERS
 from process_runner import command_for, run_process
 
 
 _CREATE_NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-
-
-INSTALL_SPECS = {
-    "claude": {
-        "label": "Claude Code",
-        "script": "irm https://claude.ai/install.ps1 | iex",
-        "method": "official_native",
-    },
-    "codex": {
-        "label": "Codex CLI",
-        "script": "irm https://chatgpt.com/codex/install.ps1 | iex",
-        "method": "official_standalone",
-    },
-}
-
-
-LOGIN_ARGS = {
-    "claude": ["auth", "login"],
-    "codex": ["login"],
-}
 
 
 def _powershell_path():
@@ -45,13 +27,12 @@ def _powershell_path():
 
 
 def _tail(text, limit=4000):
-    text = (text or "").strip()
-    return text[-limit:] if len(text) > limit else text
+    return redact_text((text or "").strip(), limit=limit)
 
 
 def install_provider(provider_id, timeout=300):
     """Install a missing provider using its official Windows installer."""
-    if provider_id not in INSTALL_SPECS:
+    if provider_id not in PROVIDERS:
         return {
             "success": False,
             "status": "unsupported_provider",
@@ -81,14 +62,14 @@ def install_provider(provider_id, timeout=300):
             "provider_id": provider_id,
         }
 
-    spec = INSTALL_SPECS[provider_id]
+    spec = PROVIDERS[provider_id]
     args = [
         "-NoLogo",
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",
         "-Command",
-        spec["script"],
+        spec.installer_script,
     ]
 
     proc = run_process(powershell, args, timeout=timeout)
@@ -112,7 +93,7 @@ def install_provider(provider_id, timeout=300):
         "success": success,
         "status": "installed" if success else "install_failed",
         "provider_id": provider_id,
-        "install_method": spec["method"],
+        "install_method": spec.installer_method,
         "exit_code": proc["exit_code"],
         "stdout": _tail(proc["stdout"]),
         "stderr": _tail(proc["stderr"]),
@@ -122,8 +103,8 @@ def install_provider(provider_id, timeout=300):
 
 def login_provider(provider_id):
     """Start the provider's official interactive login using an absolute path."""
-    args = LOGIN_ARGS.get(provider_id)
-    if args is None:
+    spec = PROVIDERS.get(provider_id)
+    if spec is None:
         return {
             "success": False,
             "status": "unsupported_provider",
@@ -142,7 +123,7 @@ def login_provider(provider_id):
 
     try:
         proc = subprocess.Popen(
-            command_for(executable, args),
+            command_for(executable, spec.login_args),
             creationflags=_CREATE_NEW_CONSOLE if os.name == "nt" else 0,
         )
     except Exception as exc:
@@ -150,7 +131,7 @@ def login_provider(provider_id):
             "success": False,
             "status": "login_failed_to_start",
             "provider_id": provider_id,
-            "error": f"{type(exc).__name__}: {exc}",
+            "error": f"{type(exc).__name__}: {redact_text(exc)}",
             "health": health,
         }
 

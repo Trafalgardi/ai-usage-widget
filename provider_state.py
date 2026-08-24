@@ -3,6 +3,7 @@
 
 from auth_health import inspect_all_auth, recommended_action, recommended_actions
 from provider_health import discover_all
+from provider_registry import PROVIDERS
 
 
 HEALTH_SCHEMA_VERSION = 2
@@ -13,7 +14,7 @@ def collect_provider_health(now=None):
     auth_by_provider = inspect_all_auth(now=now)
 
     providers = {}
-    for provider_id in ("claude", "codex"):
+    for provider_id in PROVIDERS:
         cli = cli_by_provider.get(provider_id) or {"state": "unknown"}
         auth = auth_by_provider.get(provider_id) or {"state": "unknown"}
         actions = recommended_actions(cli, auth)

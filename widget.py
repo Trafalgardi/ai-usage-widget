@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-AI Usage Widget — виджет остатков лимитов для Claude Code, Codex CLI и OpenCode.
+"""Legacy quota/tray runtime retained by the v2 Windows AI CLI Control Center.
 
-Читает локальные файлы авторизации каждого CLI и опрашивает их usage-эндпоинты:
-  * Claude Code : ~/.claude/.credentials.json  -> api.anthropic.com/api/oauth/usage
-  * Codex CLI   : ~/.codex/auth.json           -> chatgpt.com/backend-api/wham/usage
-  * OpenCode    : ~/.local/share/opencode/auth.json -> opencode.ai (best effort)
-
-Запуск:  python widget.py
-Зависимости:  pip install pywebview
+The release entry point is ``widget_v2.py``. New provider lifecycle behavior
+belongs in the extracted health, action, storage, and UI bridge modules.
 """
 
 import base64
@@ -25,7 +19,9 @@ import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
+from app_storage import ConfigStore
 from usage_health import LastGoodUsageStore, classify_exception, usage_error
+from version import APP_NAME
 
 try:
     import pystray
@@ -44,6 +40,7 @@ HOME = os.path.expanduser("~")
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
 
 DEFAULT_CONFIG = {
+    "language": "en",
     "refresh_interval_sec": 60,
     "window": {"x": None, "y": None, "width": 380, "height": 600, "on_top": True},
     "opencode": {
@@ -62,33 +59,22 @@ DEFAULT_CONFIG = {
     },
 }
 
+SETTINGS_STORE = ConfigStore(CONFIG_PATH, DEFAULT_CONFIG)
+
 
 # ----------------------------------------------------------------------------
 # helpers
 # ----------------------------------------------------------------------------
 
 def load_config():
-    cfg = json.loads(json.dumps(DEFAULT_CONFIG))
-    try:
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                user = json.load(f)
-            for k, v in user.items():
-                if isinstance(v, dict) and isinstance(cfg.get(k), dict):
-                    cfg[k].update(v)
-                else:
-                    cfg[k] = v
-    except Exception:
-        pass
-    return cfg
+    return SETTINGS_STORE.load()
 
 
 def save_config(cfg):
     try:
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2, ensure_ascii=False)
+        return SETTINGS_STORE.save(cfg)
     except Exception:
-        pass
+        return False
 
 
 def http_get_json(url, headers=None, timeout=15):
@@ -625,8 +611,8 @@ class TrayManager:
         with STATE.lock:
             snap = copy.deepcopy(STATE.snapshot)
         if not snap.get("updated_at"):
-            return "AI Usage Widget"
-        lines = ["AI Usage Widget"]
+            return APP_NAME
+        lines = [APP_NAME]
         for pid, pname in [("claude", "Claude"), ("codex", "Codex")]:
             p = snap["providers"].get(pid)
             has_usage = p and (p.get("ok") or (p.get("usage") or {}).get("stale"))
@@ -914,11 +900,13 @@ def main():
         print("Не установлен pywebview. Выполни:  pip install pywebview")
         sys.exit(1)
 
-    threading.Thread(target=refresh_loop, daemon=True).start()
+    ui_smoke = os.environ.get("AI_CLI_CONTROL_CENTER_UI_SMOKE_TEST") == "1"
+    if not ui_smoke:
+        threading.Thread(target=refresh_loop, daemon=True).start()
 
     w = CFG["window"]
     window = webview.create_window(
-        "AI Usage",
+        APP_NAME,
         url=os.path.join(APP_DIR, "ui.html"),
         js_api=JsApi(),
         width=w.get("width", 380),
@@ -930,6 +918,7 @@ def main():
         on_top=w.get("on_top", True),
         resizable=True,
         background_color="#101012",
+        hidden=ui_smoke,
     )
     # Устанавливаем иконку окна через ctypes
     icon_path = os.path.join(APP_DIR, "icon", "app.ico")
@@ -945,19 +934,22 @@ def main():
                     ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, icon)  # WM_SETICON
         except Exception:
             pass
-    if TRAY_AVAILABLE:
+    if TRAY_AVAILABLE and not ui_smoke:
         TRAY.start(window)
+    if ui_smoke:
+        threading.Timer(3, window.destroy).start()
     webview.start(debug=False)
     STATE.shutdown_event.set()
     if TRAY.icon_claude:
         TRAY.icon_claude.stop()
     if TRAY.icon_codex:
         TRAY.icon_codex.stop()
-    try:
-        CFG["window"]["x"], CFG["window"]["y"] = window.x, window.y
-        save_config(CFG)
-    except Exception:
-        pass
+    if not ui_smoke:
+        try:
+            CFG["window"]["x"], CFG["window"]["y"] = window.x, window.y
+            save_config(CFG)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

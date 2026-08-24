@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>AI Usage</title>
+  <title>AI CLI Control Center</title>
 <style>
   :root{
     --shell:#101012; --shell-line:#232327; --shell-text:#8b8b93;
@@ -150,6 +150,17 @@
   .th-codex .login-btn{background:#fff; color:#000}
   .th-codex .login-btn:hover:not(:disabled){background:#e0e0e0}
 
+  .provider-health{margin-top:14px;padding:11px 12px;border:1px solid rgba(128,128,128,.28);
+    border-radius:9px;background:rgba(20,20,24,.78);font-size:10.5px;line-height:1.5;color:#b8b8c0}
+  .provider-health .health-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .provider-health strong{color:#ececf1;font-size:11px}
+  .provider-health .health-state{font-weight:700;color:#73d69a}
+  .provider-health .health-state.warn,.provider-health .health-warning{color:#f0b35e}
+  .provider-health .health-meta{margin-top:4px;color:#92929b;word-break:break-word}
+  .provider-health .health-warning{margin-top:6px}
+  .provider-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+  .provider-actions .login-btn{width:auto;flex:1;margin-top:0;min-width:110px;padding:8px 10px}
+
   .low i{background:#c8452c !important}
   .th-codex .low i{background:#ff5c47 !important}
   .th-opencode .low{color:#ff5c47 !important}
@@ -206,7 +217,7 @@
 <body>
 <div id="app">
   <header class="pywebview-drag-region">
-    <span class="title">AI&nbsp;Usage</span>
+    <span class="title">AI CLI&nbsp;Control</span>
     <span class="updated" id="updated">…</span>
     <span class="countdown" id="countdown"></span>
     <button id="btn-refresh" title="">⟳</button>
@@ -219,7 +230,7 @@
     <div class="page active" id="page-overview">
       <div class="loading-overlay" id="loading">
         <div class="loading-spinner"></div>
-        <div class="loading-text" id="loading-text">Загрузка данных…</div>
+        <div class="loading-text" id="loading-text">Loading data…</div>
       </div>
     </div>
     <div class="page" id="page-claude"></div>
@@ -228,10 +239,10 @@
   </div>
 
   <nav>
-    <button data-page="overview" class="active" id="nav-overview">Обзор</button>
+    <button data-page="overview" class="active" id="nav-overview">Overview</button>
     <button data-page="claude" class="n-claude">Claude</button>
     <button data-page="codex" class="n-codex">Codex</button>
-    <button data-page="settings" id="nav-settings">Настройки</button>
+    <button data-page="settings" id="nav-settings">Settings</button>
   </nav>
 </div>
 
@@ -239,7 +250,7 @@
 "use strict";
 let DATA = null;
 let clockSkew = 0;
-let LANG = "ru";
+let LANG = "en";
 
 const L10N = {
   ru: {
@@ -439,10 +450,11 @@ function fmtCountdown(epoch){
 function fmtClock(epoch){
   if(!epoch) return "";
   const dt = new Date(epoch*1000);
-  const t = dt.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  const locale = LANG === "en" ? "en-US" : "ru-RU";
+  const t = dt.toLocaleTimeString(locale, {hour:"2-digit", minute:"2-digit"});
   const today = new Date(); 
   const same = dt.toDateString() === today.toDateString();
-  return same ? t : dt.toLocaleDateString([], {day:"numeric", month:"short"}) + " " + t;
+  return same ? t : dt.toLocaleDateString(locale, {day:"numeric", month:"short"}) + " " + t;
 }
 function pctText(w){
   if(w.remaining_pct == null) return "—";
@@ -536,7 +548,7 @@ function renderDetail(id){
 
   if(!p.ok && p.error){
     html += `<div class="error">${esc(terr(p.error))}</div>`;
-    if(id === "claude" || id === "codex"){
+    if((id === "claude" || id === "codex") && !(DATA.provider_health && DATA.provider_health.providers && DATA.provider_health.providers[id])){
       html += `<button class="login-btn" data-provider="${id}">${t("loginBtn")}</button>`;
     }
   }
@@ -580,6 +592,75 @@ function renderDetail(id){
       }
     });
   });
+
+  renderProviderHealth(id, el.querySelector(".detail"));
+}
+
+function healthStatusLabel(cli, auth){
+  if(cli.state === "missing") return "CLI not found";
+  if(cli.state === "broken") return "CLI needs repair";
+  if(auth.state === "login_required" || auth.state === "missing_credentials") return "Sign-in required";
+  if(auth.state === "credentials_broken") return "Credentials need repair";
+  if(["access_expired_refreshable","access_missing_refreshable","session_present_metadata_incomplete"].includes(auth.state)) return "Session needs refresh";
+  if(auth.state === "expiring") return "Ready · session expiring";
+  if(cli.state === "installed" && auth.state === "valid") return "Ready";
+  return "Checking";
+}
+
+function providerActionLabel(action, id){
+  const labels = {
+    install: `Install ${id === "claude" ? "Claude Code" : "Codex CLI"}`,
+    refresh_session: "Refresh session",
+    login: action.label_key === "sign_in_again" ? "Sign in again" : "Sign in",
+    retry: "Retry check",
+    diagnostics: "Show diagnostics"
+  };
+  return labels[action.id] || action.id;
+}
+
+async function runProviderAction(id, action, button){
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = "Working…";
+  try{
+    const result = await window.pywebview.api.execute_provider_action(id, action.id);
+    if(result && result.provider_health && DATA){ DATA.provider_health = result.provider_health; renderAll(); }
+    if(result && result.success){
+      button.textContent = result.status === "diagnostics_ready" ? "Diagnostics updated" : "Done";
+      await window.pywebview.api.refresh_now();
+      setTimeout(() => pull(true), 1200);
+      setTimeout(() => pull(true), 3500);
+    }else{
+      button.textContent = (result && (result.message || result.status)) || "Action failed";
+      button.disabled = false;
+    }
+  }catch(e){ button.textContent = original; button.disabled = false; }
+}
+
+function renderProviderHealth(id, detail){
+  const item = DATA && DATA.provider_health && DATA.provider_health.providers && DATA.provider_health.providers[id];
+  if(!item || !detail) return;
+  const cli = item.cli || {}, auth = item.auth || {}, usage = item.usage || {};
+  const label = healthStatusLabel(cli, auth);
+  const healthy = label.startsWith("Ready");
+  const panel = document.createElement("section");
+  panel.className = "provider-health";
+  panel.innerHTML = `<div class="health-head"><strong>Provider Health</strong><span class="health-state ${healthy?'':'warn'}">${esc(label)}</span></div>` +
+    `<div class="health-meta">CLI: ${esc(cli.version || cli.state || "unknown")}${cli.install_method ? ` · ${esc(cli.install_method)}` : ""}</div>` +
+    `<div class="health-meta">Authentication: ${esc((auth.state || "unknown").replaceAll("_", " "))}</div>` +
+    (cli.path_conflict ? `<div class="health-warning">Multiple installations detected. PATH may select an older copy.</div>` : "") +
+    (usage.stale ? `<div class="health-warning">Usage is temporarily unavailable. Showing the last successful snapshot.</div>` : "");
+  const actions = document.createElement("div");
+  actions.className = "provider-actions";
+  for(const action of (item.actions || [])){
+    const button = document.createElement("button");
+    button.className = "login-btn";
+    button.textContent = providerActionLabel(action, id);
+    if(window.pywebview) button.addEventListener("click", () => runProviderAction(id, action, button));
+    actions.appendChild(button);
+  }
+  if(actions.childElementCount) panel.appendChild(actions);
+  detail.appendChild(panel);
 }
 
 function renderAll(){
@@ -642,6 +723,19 @@ function renderSettings(){
             <span class="slider"></span>
           </label>
         </div>
+        <div class="toggle-row">
+          <label>Start with Windows</label>
+          <label class="switch">
+            <input type="checkbox" id="cfg-startup" ${DATA.startup?.enabled ? 'checked' : ''} ${DATA.startup?.supported === false ? 'disabled' : ''}>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Application</div>
+        <button class="save-btn" id="btn-check-updates">Check for updates</button>
+        <div class="saved-msg" id="update-result" style="display:none"></div>
+        <div class="meta" style="margin-top:8px">Version ${esc(DATA.app_version || "development")} · Update checks contact GitHub only when requested.</div>
       </div>
       <button class="save-btn" id="btn-save-settings">${t("save")}</button>
       <div class="saved-msg" id="saved-msg" style="display:none">${t("saved")}</div>
@@ -680,6 +774,19 @@ function renderSettings(){
     // Обновляем кнопку в хедере
     const pinBtn = $("#btn-pin");
     if(pinBtn) pinBtn.classList.toggle("pin-on", !!v);
+  });
+  $("#cfg-startup")?.addEventListener("change", async (event) => {
+    const result = await window.pywebview.api.set_start_with_windows(event.target.checked);
+    if(!result.success) event.target.checked = !event.target.checked;
+  });
+  $("#btn-check-updates")?.addEventListener("click", async () => {
+    const output = $("#update-result");
+    output.style.display = "block";
+    output.textContent = "Checking GitHub Releases…";
+    const result = await window.pywebview.api.check_for_updates();
+    output.textContent = result.status === "update_available"
+      ? `Version ${result.latest_version} is available on GitHub Releases.`
+      : result.status === "up_to_date" ? "You are up to date." : "Update check failed. Try again later.";
   });
 }
 
@@ -787,7 +894,10 @@ window.addEventListener("pywebviewready", () => {
 setTimeout(() => {
   if(window.pywebview) return;
   clockSkew = 0;
-  DATA = {updated_at: Date.now()/1000, providers: {
+  const demo = new URLSearchParams(location.search).get("demo") || "ready";
+  const missing = demo === "missing";
+  const degraded = demo === "degraded";
+  DATA = {contract_version:1,app_version:"2.0.0",startup:{supported:true,enabled:false},_config:{language:"en",refresh_interval_sec:60,window:{width:380,height:600,on_top:true}},updated_at: Date.now()/1000, providers: {
     claude:{id:"claude",name:"Claude Code",ok:true,meta:{subscription:"max"},windows:[
       {id:"session",label:"Сессия (5 ч)",remaining_pct:64,resets_at:Date.now()/1000+7620},
       {id:"week",label:"Неделя",remaining_pct:41,resets_at:Date.now()/1000+3600*52},
@@ -795,12 +905,15 @@ setTimeout(() => {
     codex:{id:"codex",name:"Codex CLI",ok:true,meta:{plan:"plus"},windows:[
       {id:"session",label:"Сессия (5 ч)",remaining_pct:73,resets_at:Date.now()/1000+4980},
       {id:"week",label:"Неделя",remaining_pct:12,resets_at:Date.now()/1000+3600*30}]},
-    opencode:{id:"opencode",name:"OpenCode",ok:true,meta:{plan:"go"},windows:[
-      {id:"session",label:"Сессия (5 ч)",remaining_pct:81,used_usd:2.3,limit_usd:12,resets_at:Date.now()/1000+9000},
-      {id:"week",label:"Неделя",remaining_pct:70,used_usd:9,limit_usd:30,resets_at:Date.now()/1000+3600*90},
-      {id:"month",label:"Месяц",remaining_pct:75,used_usd:15,limit_usd:60,resets_at:Date.now()/1000+3600*400}]}
-  }};
+  },provider_health:{schema_version:2,providers:{
+    claude:{cli:{state:missing?"missing":"installed",version:missing?null:"2.1.226",install_method:"native",path_conflict:false},auth:{state:degraded?"access_expired_refreshable":(missing?"missing_credentials":"valid")},usage:{state:"available",stale:false},actions:missing?[{id:"install",label_key:"install_cli"}]:(degraded?[{id:"refresh_session",label_key:"refresh_session"},{id:"login",label_key:"sign_in_again"}]:[])},
+    codex:{cli:{state:"installed",version:"codex-cli 1.2.0",install_method:"standalone",path_conflict:false},auth:{state:"valid"},usage:{state:"available",stale:false},actions:[]}
+  }}};
+  LANG = "en";
+  updateTitles();
   renderAll();
+  const screen = new URLSearchParams(location.search).get("screen");
+  if(screen === "claude" || screen === "codex" || screen === "settings") showPage(screen);
 }, 800);
 </script>
 </body>

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-cli-control-center"
+version = "2.0.0"
+description = "Windows control center for installing, diagnosing, repairing, and monitoring Claude Code and Codex CLI"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = "MIT"
+authors = [{name = "Trafalgardi"}]
+dependencies = [
+  "pywebview==5.4",
+  "pystray==0.19.5",
+  "Pillow==11.3.0",
+]
+
+[project.urls]
+Homepage = "https://trafalgardi.github.io/ai-usage-widget/"
+Repository = "https://github.com/Trafalgardi/ai-usage-widget"
+Issues = "https://github.com/Trafalgardi/ai-usage-widget/issues"
+
+[tool.setuptools]
+py-modules = [
+  "app_storage", "application", "auth_health", "error_model", "process_runner",
+  "provider_actions", "provider_health", "provider_registry", "provider_state",
+  "session_repair", "ui_bridge", "ui_contract", "update_service", "usage_health",
+  "version", "widget", "widget_v2", "windows_integration",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

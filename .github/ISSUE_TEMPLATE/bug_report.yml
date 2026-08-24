@@ -1,0 +1,31 @@
+name: Bug report
+description: Report a reproducible Control Center problem without sharing credentials.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Never attach auth.json, .credentials.json, tokens, or unsanitized logs."
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options: [Claude Code, Codex CLI, Both, Application/packaging]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Windows, app, and CLI versions

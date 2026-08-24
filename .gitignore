@@ -28,3 +28,6 @@ config.json
 Thumbs.db
 icon/app.ico
 *.spec
+!AI-CLI-Control-Center.spec
+!icon/app.ico
+.venv-build/

@@ -1,0 +1,38 @@
+name: Prepare release artifacts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  prepare:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+      - name: Build and smoke-test
+        shell: pwsh
+        run: ./scripts/build.ps1 -Python "python"
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: dist/sbom.cdx.json
+      - name: Attest executable provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/AI-CLI-Control-Center.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate-v2.0.0
+          path: dist/
+          if-no-files-found: error

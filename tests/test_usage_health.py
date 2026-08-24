@@ -1,7 +1,8 @@
 import unittest
 import urllib.error
+import json
 
-from usage_health import LastGoodUsageStore, classify_http_error
+from usage_health import LastGoodUsageStore, classify_exception, classify_http_error
 
 
 class UsageHealthTests(unittest.TestCase):
@@ -49,6 +50,14 @@ class UsageHealthTests(unittest.TestCase):
         self.assertEqual(63, failed["windows"][0]["remaining_pct"])
         self.assertTrue(failed["usage"]["stale"])
         self.assertEqual(100, failed["usage"]["last_success_at"])
+
+    def test_malformed_json_is_a_format_error(self):
+        try:
+            json.loads("{")
+        except json.JSONDecodeError as error:
+            usage = classify_exception(error)
+        self.assertEqual("unsupported_response", usage["state"])
+        self.assertEqual("format", usage["error_kind"])
 
 
 if __name__ == "__main__":

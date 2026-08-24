@@ -1,4 +1,4 @@
-name: Tests
+name: Test and build
 
 on:
   push:
@@ -20,3 +20,28 @@ jobs:
           python-version: "3.12"
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
+      - name: Verify imports and bytecode
+        run: python -m compileall -q .
+      - name: Verify release-facing local links
+        run: python scripts/check_links.py
+
+  windows-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+      - name: Build executable
+        shell: pwsh
+        run: ./scripts/build.ps1 -Python "python"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-cli-control-center-windows
+          path: |
+            dist/AI-CLI-Control-Center.exe
+            dist/AI-CLI-Control-Center-v2.0.0-windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error

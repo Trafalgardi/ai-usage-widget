@@ -11,6 +11,8 @@ import os
 import time
 from datetime import datetime, timezone
 
+from error_model import redact_text
+
 
 def _to_epoch(value):
     if value is None:
@@ -51,7 +53,20 @@ def _read_json(path):
         with open(path, "r", encoding="utf-8") as stream:
             return json.load(stream), None
     except Exception as exc:
-        return None, f"{type(exc).__name__}: {exc}"
+        return None, f"{type(exc).__name__}: {redact_text(exc)}"
+
+
+def _display_path(path):
+    """Expose only a stable, non-machine-specific credential location."""
+    home = os.path.abspath(os.path.expanduser("~"))
+    absolute = os.path.abspath(path)
+    try:
+        relative = os.path.relpath(absolute, home)
+        if relative != ".." and not relative.startswith(".." + os.sep):
+            return os.path.join("~", relative).replace("\\", "/")
+    except (OSError, ValueError):
+        pass
+    return os.path.basename(absolute)
 
 
 def _claude_credential_paths():
@@ -95,12 +110,18 @@ def inspect_claude_auth(now=None):
         result["reason"] = "credential_file_missing"
         return result
 
-    result["credential_path"] = path
+    result["credential_path"] = _display_path(path)
     data, error = _read_json(path)
     if error:
         result["state"] = "credentials_broken"
         result["reason"] = "credential_file_unreadable"
         result["error"] = error
+        return result
+
+    if not isinstance(data, dict):
+        result["state"] = "credentials_broken"
+        result["reason"] = "credential_root_invalid"
+        result["error"] = "Credential file root must be an object"
         return result
 
     oauth = data.get("claudeAiOauth") or data.get("oauth")
@@ -183,7 +204,7 @@ def inspect_codex_auth(now=None):
         result["reason"] = "credential_file_missing"
         return result
 
-    result["credential_path"] = path
+    result["credential_path"] = _display_path(path)
     auth, error = _read_json(path)
     if error:
         result["state"] = "credentials_broken"
@@ -191,7 +212,15 @@ def inspect_codex_auth(now=None):
         result["error"] = error
         return result
 
+    if not isinstance(auth, dict):
+        result["state"] = "credentials_broken"
+        result["reason"] = "credential_root_invalid"
+        result["error"] = "Credential file root must be an object"
+        return result
+
     tokens = auth.get("tokens") or {}
+    if not isinstance(tokens, dict):
+        tokens = {}
     access = tokens.get("access_token") or auth.get("access_token")
     refresh = tokens.get("refresh_token") or auth.get("refresh_token")
     claims = _jwt_claims(access) if access else {}

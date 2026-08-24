@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
-echo Установка зависимостей виджета...
-python -m pip install --upgrade pywebview pystray Pillow
+echo Installing pinned AI CLI Control Center dependencies...
+py -3.12 -m pip install -r requirements-build.txt
 echo.
-echo Готово! Запускай start_widget.vbs или: python widget_v2.py
+echo Done. Run start_widget.vbs or: py -3.12 widget_v2.py
 pause

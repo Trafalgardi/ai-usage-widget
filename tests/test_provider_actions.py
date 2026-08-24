@@ -40,12 +40,34 @@ class ProviderActionTests(unittest.TestCase):
         self.assertEqual("already_installed", result["status"])
         run.assert_not_called()
 
+    def test_installer_timeout_is_deterministic(self):
+        with patch("provider_actions.discover_cli", return_value={"state": "missing"}), patch(
+            "provider_actions.os.name", "nt"
+        ), patch("provider_actions._powershell_path", return_value=r"C:\Windows\powershell.exe"), patch(
+            "provider_actions.run_process",
+            return_value={"started": True, "timed_out": True, "exit_code": None, "stdout": "", "stderr": "", "error": "timeout"},
+        ):
+            result = provider_actions.install_provider("claude")
+        self.assertFalse(result["success"])
+        self.assertEqual("installer_timeout", result["status"])
+
+    def test_installer_output_redacts_token_like_values(self):
+        states = [{"state": "missing"}, {"state": "broken"}]
+        with patch("provider_actions.discover_cli", side_effect=states), patch(
+            "provider_actions.os.name", "nt"
+        ), patch("provider_actions._powershell_path", return_value=r"C:\Windows\powershell.exe"), patch(
+            "provider_actions.run_process",
+            return_value={"started": True, "timed_out": False, "exit_code": 1, "stdout": "access_token=secret-value", "stderr": "", "error": None},
+        ):
+            result = provider_actions.install_provider("codex")
+        self.assertNotIn("secret-value", result["stdout"])
+
     def test_v2_action_returns_fresh_health_for_immediate_ui_update(self):
         api = widget_v2.V2JsApi()
         fresh = {"schema_version": 2, "providers": {"claude": {
             "cli": {"state": "installed"},
         }}}
-        with patch("widget_v2.run_install_provider", return_value={
+        with patch("ui_bridge.install_provider", return_value={
             "success": True,
             "status": "installed",
         }), patch.object(api, "_provider_health", return_value=fresh) as health:

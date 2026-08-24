@@ -1,232 +1,147 @@
-# AI Usage Widget for Windows — Claude Code & Codex CLI Usage Limit Tracker
+# AI CLI Control Center for Windows
 
-A free, open-source Windows desktop widget for monitoring **Claude Code** and **Codex CLI** usage limits in real time. It shows 5-hour and weekly quotas, reset countdowns, account status, and usage percentages in an always-on-top window and the Windows system tray.
+> Install, diagnose, repair, and monitor Claude Code and OpenAI Codex CLI from one small Windows app.
 
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows)](https://github.com/Trafalgardi/ai-usage-widget/releases/latest)
-[![Latest release](https://img.shields.io/github/v/release/Trafalgardi/ai-usage-widget)](https://github.com/Trafalgardi/ai-usage-widget/releases/latest)
+[![Tests](https://github.com/Trafalgardi/ai-usage-widget/actions/workflows/tests.yml/badge.svg)](https://github.com/Trafalgardi/ai-usage-widget/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Download:** [Latest Windows release](https://github.com/Trafalgardi/ai-usage-widget/releases/latest)
+AI CLI Control Center is an independent, open-source Windows companion for **Claude Code** and **OpenAI Codex CLI**. Provider Health detects whether each CLI is installed and working, checks sign-in metadata, identifies conflicting PATH copies, offers the appropriate recovery action, and keeps usage limits visible in the app and system tray.
 
-![AI Usage Widget overview](preview/shot_overview.png)
+**Download:** [latest Windows release](https://github.com/Trafalgardi/ai-usage-widget/releases/latest) · v2 is currently prepared as a release candidate in this branch.
 
-## Claude Code and Codex usage monitor for Windows
+![Main dashboard showing Claude Code and Codex CLI](docs/assets/control-center-dashboard.png)
 
-AI Usage Widget helps Windows users track Claude Code and Codex CLI rate limits without repeatedly opening each CLI. It works as an always-on-top desktop widget and as a system tray quota monitor.
+## From download to ready in 30 seconds
 
-Use it as a:
+1. Download the release ZIP, verify `SHA256SUMS.txt`, and run `AI-CLI-Control-Center.exe`.
+2. Open a provider card. Provider Health detects the CLI, its version, sign-in state, and PATH conflicts.
+3. If needed, choose **Install**, **Refresh session**, or **Sign in**. Actions use the provider's official installer or discovered CLI executable.
+4. Leave the Control Center open or minimize it to the tray to monitor session and weekly limits.
 
-- Claude Code usage widget for Windows
-- Codex CLI usage tracker
-- AI quota monitor
-- Rate-limit and reset-time tracker
-- Windows system tray usage monitor
+No separate project account is required. Windows may show a SmartScreen warning until release binaries are code-signed; verify the checksum and GitHub provenance before running an unsigned build.
 
-## Features
+## What it does
 
-### Overview
+| Capability | Claude Code | Codex CLI |
+|---|---:|---:|
+| Discover PATH and known Windows installs | Yes | Yes |
+| Probe CLI version and detect broken copies | Yes | Yes |
+| Detect multiple PATH copies | Yes | Yes |
+| Install using the official Windows script | Yes | Yes |
+| Launch official CLI sign-in | Yes | Yes |
+| Refresh an expired but recoverable session | User-triggered CLI probe | Sign in through Codex CLI |
+| Session and weekly usage limits | Yes, when endpoint data is available | Yes, when endpoint data is available |
+| Stale last-good usage during temporary failures | Yes | Yes |
 
-- Real-time usage limits for Claude Code and Codex CLI
-- Current 5-hour session remaining
-- Weekly usage remaining
-- Reset date and countdown timer
-- Plan and account status
-- Additional model limits when available
+![Claude Provider Health ready state](docs/assets/provider-health-ready.png)
 
-### Screens
+## Provider Health and recovery
 
-1. **Overview** — current 5-hour session remaining for both services with reset timer
-2. **Claude** — session, weekly usage, and Opus weekly usage when available
-3. **Codex** — session, weekly usage, plan, and additional model limits
-4. **Settings** — refresh interval, window size, language, and always-on-top mode
+The app treats installation, authentication, and usage as separate health signals. A usage timeout does not automatically become a login error.
 
-### Status indicators
+| State | Recommended action |
+|---|---|
+| CLI not found | Install with the provider's official Windows installer |
+| CLI found but version probe fails | Review the detected copies and repair PATH/install |
+| Credentials missing or unusable | Start the official CLI sign-in flow |
+| Claude access session expired but refreshable | Run one explicit minimal Claude inference, then re-check metadata |
+| Network/server/format failure | Retry while keeping the last successful usage snapshot |
 
-- **Active** — token is valid
-- **Expiring** — less than one hour remains
-- **Expired** — login is required
-- **Red usage bar** — 85% or more of the limit has been consumed
-- **Refresh countdown** — seconds until the next automatic update
+The Claude refresh action can consume a very small amount of quota. The app never exchanges or writes OAuth refresh tokens itself.
 
-### Windows system tray
+<table>
+  <tr><td><img src="docs/assets/provider-cli-missing.png" alt="Claude CLI not found with Install Claude Code action"></td><td><img src="docs/assets/provider-auth-degraded.png" alt="Claude session needs refresh with repair actions"></td></tr>
+</table>
 
-Minimize the app to the Windows system tray while it continues updating in the background.
+![Sanitized Provider Health recovery sequence](docs/assets/provider-recovery-sequence.gif)
 
-- Orange percentage icon — Claude Code
-- Green percentage icon — Codex CLI
-- Hover for detailed usage information
-- Right-click to show, refresh, or exit
+## More than a usage monitor
 
-### Provider health and recovery
+Traditional usage widgets answer “how much quota remains?” AI CLI Control Center also answers “is the CLI installed, which copy will Windows run, is the session recoverable, and what should I do next?” It remains deliberately focused on Claude Code and Codex CLI rather than adding broad provider coverage before these recovery flows are dependable.
 
-The v2 entry point separates CLI installation, authentication, and usage health. It can discover multiple Windows CLI installations, show the selected executable and version, preserve the last successful usage snapshot during temporary failures, and recommend an action from structured state.
+## Privacy and trust
 
-- Missing CLI → install with the official provider installer
-- Refreshable Claude session → run an explicit minimal Claude CLI probe before offering full login
-- Missing or unusable credentials → sign in with the discovered absolute CLI path
-- Network, rate-limit, server, or response-format failure → never infer that login is required
+The app has no analytics, telemetry, advertising, project-operated backend, or account system. It reads the official CLIs' local credential files and sends usage requests directly to the corresponding provider. Tokens are not included in Provider Health snapshots and are not sent to this project.
 
-The Claude refresh probe is user-initiated because it performs one minimal real inference and can consume a small amount of quota. The widget never exchanges or writes OAuth refresh tokens itself.
+- Claude credentials: `~/.claude/.credentials.json` or `~/.config/claude/.credentials.json`
+- Codex credentials: `$CODEX_HOME/auth.json` or `~/.codex/auth.json`
+- Claude usage: `api.anthropic.com/api/oauth/usage` (with the existing `claude.ai` fallback)
+- Codex usage: `chatgpt.com/backend-api/wham/usage`
+- Manual update check: GitHub Releases API; it does not download or replace the executable
 
-## Download and installation
-
-### Recommended: Windows release
-
-Download the latest packaged version from the [Releases page](https://github.com/Trafalgardi/ai-usage-widget/releases/latest).
-
-### Run from source
-
-Requirements:
-
-- Windows 10 or Windows 11
-- Python 3.10+
-- WebView2 Runtime
-
-Install dependencies:
-
-```bash
-pip install pywebview pystray Pillow
-```
-
-Run the widget:
-
-```bash
-python widget_v2.py
-```
-
-Or double-click `start_widget.vbs` to launch without a console window.
-
-### Start automatically with Windows
-
-1. Press `Win+R`.
-2. Enter `shell:startup`.
-3. Add a shortcut to `start_widget.vbs` or the packaged executable.
-
-## Screenshots
-
-![Claude Code usage limits](preview/shot_claude.png)
-![Codex CLI usage limits](preview/shot_codex.png)
-![Widget settings](preview/shot_settings.png)
-![Windows system tray usage icons](preview/shot_tray.png)
-
-## Privacy and data sources
-
-The widget sends requests only to the service endpoints used for retrieving account usage. Authentication tokens are read locally from the same credential files used by the official CLIs.
-
-| Service | Local credential file | Usage endpoint |
-|---|---|---|
-| Claude Code | `~/.claude/.credentials.json` | `api.anthropic.com/api/oauth/usage` |
-| Codex CLI | `~/.codex/auth.json` | `chatgpt.com/backend-api/wham/usage` |
-
-Authentication and install actions are also available from the provider card when the corresponding CLI state supports them.
-
-The usage endpoints are undocumented and may change. If a card stops updating after a CLI update, open an issue with the error details.
-
-## Settings
-
-The Settings screen supports:
-
-- Refresh interval: 15–600 seconds
-- Window width: 200–800 px
-- Window height: 300–1200 px
-- Always-on-top mode
-- Russian and English interface languages
-
-Example `config.json`:
-
-```json
-{
-  "language": "en",
-  "refresh_interval_sec": 60,
-  "window": {
-    "width": 380,
-    "height": 600,
-    "on_top": true,
-    "x": null,
-    "y": null
-  }
-}
-```
+See [PRIVACY.md](PRIVACY.md) for exact local files, registry changes, and network destinations, and [SECURITY.md](SECURITY.md) for reporting and security boundaries. This project is independent and is not affiliated with Anthropic or OpenAI.
 
 ## Troubleshooting
 
-### HTTP 401 or 403
+### CLI not found after installation
 
-This is an authentication-related usage failure, but it does not necessarily mean that full login is required. If Claude still has a usable refresh session, choose **Refresh session** first. Sign in again only when the structured auth state requires it or repair fails.
+Restart the app so it inherits the latest PATH. Provider Health also checks known native, standalone, WinGet, and npm locations. If multiple working copies are detected, remove the obsolete PATH entry or reinstall the desired copy.
+
+### Credentials missing or damaged
+
+Do not edit token values in the Control Center. Choose **Sign in** to open the provider's official interactive login. Never attach `auth.json`, `.credentials.json`, or unsanitized logs to an issue.
+
+### Usage unavailable but the CLI works
+
+The usage endpoints are service-owned and may change. Network, rate-limit, server, and malformed-response errors are classified separately; the last good usage remains visible as stale data. Retry before signing in again.
 
 ### Empty window
 
-Install Microsoft Edge WebView2 Runtime. It is included with Windows 11 and most current Windows 10 installations.
+Install or repair Microsoft Edge WebView2 Runtime. It is included with Windows 11 and most maintained Windows 10 installations.
 
-### Red usage bar
+### Windows SmartScreen warning
 
-The remaining quota is 15% or less.
+The current project does not yet publish a signed executable. Download only from GitHub Releases, compare SHA-256 with `SHA256SUMS.txt`, and verify provenance when available.
 
-### Python icon instead of the app icon
+## Run from source
 
-Restart the application. The icon is applied after window creation.
+Requirements: Windows 10/11, Python 3.10–3.13, and WebView2.
 
-## Frequently asked questions
-
-### What does AI Usage Widget track?
-
-It tracks available Claude Code and Codex CLI usage limits, including session limits, weekly limits, reset times, and account status when exposed by the service.
-
-### Is this an API cost tracker?
-
-No. It focuses on subscription and CLI usage limits rather than API billing or token costs.
-
-### Does it work on Windows 10 and Windows 11?
-
-Yes. The app is intended for current Windows 10 and Windows 11 systems with WebView2 available.
-
-### Does it upload my tokens anywhere?
-
-The application reads the local CLI credential files and requests usage information from the relevant service endpoints. It does not require a separate account or external database.
-
-### Is the project affiliated with Anthropic or OpenAI?
-
-No. This is an independent open-source project and is not an official Anthropic or OpenAI product.
-
-## Development
-
-### Dependencies
-
-- `pywebview` — WebView2-based window
-- `pystray` — Windows system tray integration
-- `Pillow` — tray icon generation
-
-### Project structure
-
-```text
-usage-widget/
-├── widget.py
-├── widget_v2.py
-├── provider_health.py
-├── auth_health.py
-├── usage_health.py
-├── provider_actions.py
-├── session_repair.py
-├── ui.html
-├── config.json
-├── icon/
-├── preview/
-├── docs/
-├── install.bat
-└── start_widget.vbs
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements-build.txt
+.\.venv\Scripts\python widget_v2.py
 ```
 
-### Build a Windows executable
+`widget_v2.py` remains the compatible entry point; `application.py` is the v2 composition root.
 
-```bash
-pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name="AI-Usage" --icon="icon/app.ico" --add-data "ui.html;." --add-data "icon/512.png;icon" --add-data "icon/app.ico;icon" --collect-all pywebview --collect-all pystray widget_v2.py
+## Development and tests
+
+```powershell
+py -3.12 -m unittest discover -s tests -v
+py -3.12 -m compileall -q .
 ```
 
-## Website
+Tests mock all network, installer, process, and credential behavior. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The project website source is stored in [`docs/`](docs/) and is ready to be published with GitHub Pages.
+Key modules:
+
+- `application.py` — composition root
+- `provider_registry.py` — supported provider and action definitions
+- `provider_health.py` / `auth_health.py` / `usage_health.py` — separate health signals
+- `process_runner.py` — normalized, non-shell process execution
+- `ui_contract.py` / `ui_bridge.py` — typed versioned WebView boundary
+- `windows_integration.py` / `update_service.py` — startup and read-only update discovery
+
+## Reproducible Windows build
+
+```powershell
+.\scripts\build.ps1
+```
+
+The script creates an isolated `.venv-build`, installs pinned dependencies, runs all tests, builds with the checked-in PyInstaller spec, smoke-starts the EXE, and creates:
+
+- `dist/AI-CLI-Control-Center.exe`
+- `dist/AI-CLI-Control-Center-v2.0.0-windows-x64.zip`
+- `dist/SHA256SUMS.txt`
+
+CI performs the same Windows build. The manual release-artifact workflow also creates a CycloneDX SBOM and GitHub build-provenance attestation; it does not publish a GitHub Release.
+
+## Release status
+
+See [CHANGELOG.md](CHANGELOG.md) for v2 notes and [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the owner-only publication, signing, GitHub metadata, and WinGet steps.
 
 ## License
 
-MIT
+[MIT](LICENSE)

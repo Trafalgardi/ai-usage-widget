@@ -9,6 +9,7 @@ import os
 import shutil
 
 from process_runner import run_process
+from provider_registry import get_provider
 
 
 def _norm_path(path):
@@ -92,6 +93,7 @@ def _provider_spec(provider_id):
     local_appdata = os.environ.get("LOCALAPPDATA", "")
     appdata = os.environ.get("APPDATA", "")
 
+    registry_spec = get_provider(provider_id)
     if provider_id == "claude":
         known = [
             (os.path.join(user_profile, ".local", "bin", "claude.exe"), "native", "known_path"),
@@ -104,7 +106,7 @@ def _provider_spec(provider_id):
             (os.path.join(appdata, "npm", "claude.cmd"), "npm", "known_path"),
         ]
         return {
-            "command": "claude",
+            "command": registry_spec.command,
             "version_args": ["--version"],
             "known": known,
         }
@@ -127,7 +129,7 @@ def _provider_spec(provider_id):
             (os.path.join(appdata, "npm", "codex.cmd"), "npm", "known_path"),
         ]
         return {
-            "command": "codex",
+            "command": registry_spec.command,
             "version_args": ["--version"],
             "known": known,
         }
