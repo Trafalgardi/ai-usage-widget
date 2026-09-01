@@ -66,8 +66,10 @@ class TrayManagerTests(unittest.TestCase):
     def test_failed_application_icon_creation_leaves_window_visible(self):
         tray = widget.TrayManager()
         tray.window_ref = MagicMock()
-        with patch("widget.TRAY_AVAILABLE", True), patch(
-            "widget.pystray.Icon", side_effect=RuntimeError("tray unavailable")
+        pystray = MagicMock()
+        pystray.Icon.side_effect = RuntimeError("tray unavailable")
+        with patch("widget.TRAY_AVAILABLE", True), patch.object(
+            widget, "pystray", pystray, create=True
         ), patch.object(widget, "TRAY", tray):
             self.assertFalse(tray.ensure_available())
             self.assertFalse(widget.JsApi().minimize_to_tray())
