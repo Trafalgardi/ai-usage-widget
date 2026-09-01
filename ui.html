@@ -621,9 +621,12 @@ function renderDetail(id){
   renderProviderHealth(id, el.querySelector(".detail"));
 }
 
-function healthStatusLabel(cli, auth){
+function healthStatusLabel(cli, auth, recovery){
   if(cli.state === "missing") return "CLI not found";
   if(cli.state === "broken") return "CLI needs repair";
+  if(recovery === "session_recovered") return "Session recovered";
+  if(recovery === "refresh_failed") return "Session refresh failed";
+  if(recovery === "recovery_already_running") return "Refreshing session…";
   if(auth.state === "login_required" || auth.state === "missing_credentials") return "Sign-in required";
   if(auth.state === "credentials_broken") return "Credentials need repair";
   if(["access_expired_refreshable","access_missing_refreshable","session_present_metadata_incomplete"].includes(auth.state)) return "Session needs refresh";
@@ -666,7 +669,8 @@ function renderProviderHealth(id, detail){
   const item = DATA && DATA.provider_health && DATA.provider_health.providers && DATA.provider_health.providers[id];
   if(!item || !detail) return;
   const cli = item.cli || {}, auth = item.auth || {}, usage = item.usage || {};
-  const label = healthStatusLabel(cli, auth);
+  const runtime = DATA && DATA.providers && DATA.providers[id] && DATA.providers[id].meta || {};
+  const label = healthStatusLabel(cli, auth, runtime.session_recovery);
   const healthy = label.startsWith("Ready");
   const panel = document.createElement("section");
   panel.className = "provider-health";
@@ -967,7 +971,7 @@ setTimeout(() => {
   const demo = new URLSearchParams(location.search).get("demo") || "ready";
   const missing = demo === "missing";
   const degraded = demo === "degraded";
-  DATA = {contract_version:1,app_version:"2.1.0",startup:{supported:true,enabled:false},_config:{language:"en",refresh_interval_sec:60,window:{width:380,height:600,on_top:true},history:{enabled:true,retention_days:30},alerts:{enabled:false,remaining_threshold_pct:15,cooldown_sec:3600}},updated_at: Date.now()/1000, providers: {
+  DATA = {contract_version:1,app_version:"2.1.1",startup:{supported:true,enabled:false},_config:{language:"en",refresh_interval_sec:60,window:{width:380,height:600,on_top:true},history:{enabled:true,retention_days:30},alerts:{enabled:false,remaining_threshold_pct:15,cooldown_sec:3600}},updated_at: Date.now()/1000, providers: {
     claude:{id:"claude",name:"Claude Code",ok:true,meta:{subscription:"max"},windows:[
       {id:"session",label:"Сессия (5 ч)",remaining_pct:64,resets_at:Date.now()/1000+7620},
       {id:"week",label:"Неделя",remaining_pct:41,resets_at:Date.now()/1000+3600*52},
@@ -988,7 +992,7 @@ setTimeout(() => {
     const panel = $("#diagnostics-preview");
     if(panel) panel.style.display = "block";
     const text = $("#diagnostics-text");
-    if(text) text.value = `AI CLI Control Center diagnostics (redacted)\n{\n  "app": {"version": "2.1.0"},\n  "os": {"system": "Windows", "release": "11", "architecture": "AMD64"},\n  "providers": {\n    "claude": {"discovery_status": "installed", "cli_version": "2.1.226", "path_conflict_category": "none"},\n    "codex": {"discovery_status": "installed", "cli_version": "codex-cli 1.2.0", "path_conflict_category": "none"}\n  }\n}`;
+    if(text) text.value = `AI CLI Control Center diagnostics (redacted)\n{\n  "app": {"version": "2.1.1"},\n  "os": {"system": "Windows", "release": "11", "architecture": "AMD64"},\n  "providers": {\n    "claude": {"discovery_status": "installed", "cli_version": "2.1.226", "path_conflict_category": "none"},\n    "codex": {"discovery_status": "installed", "cli_version": "codex-cli 1.2.0", "path_conflict_category": "none"}\n  }\n}`;
   }
 }, 800);
 </script>

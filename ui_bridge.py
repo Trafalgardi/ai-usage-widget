@@ -29,6 +29,7 @@ class ControlCenterApi(legacy_widget.JsApi):
         self._health_lock = threading.Lock()
         self._health_cache = None
         self._health_cached_at = 0.0
+        self._last_recovered_snapshot = None
 
     def _provider_health(self, force=False):
         now = time.time()
@@ -47,6 +48,13 @@ class ControlCenterApi(legacy_widget.JsApi):
         snap["app_version"] = __version__
         snap["startup"] = startup_status()
         try:
+            recovered = any(
+                (provider.get("meta") or {}).get("session_recovery") == "session_recovered"
+                for provider in (snap.get("providers") or {}).values()
+            )
+            if recovered and self._last_recovered_snapshot != snap.get("updated_at"):
+                self._last_recovered_snapshot = snap.get("updated_at")
+                self._invalidate_health()
             health = copy.deepcopy(self._provider_health())
             for provider_id, provider in (snap.get("providers") or {}).items():
                 item = (health.get("providers") or {}).get(provider_id)
@@ -68,7 +76,12 @@ class ControlCenterApi(legacy_widget.JsApi):
         for provider_id in result:
             auth = ((health.get("providers") or {}).get(provider_id) or {}).get("auth") or {}
             state = auth.get("state")
-            status = {"valid": "valid", "expiring": "expiring", "access_expired_refreshable": "expired", "access_missing_refreshable": "expired"}.get(state)
+            status = {
+                "valid": "valid",
+                "expiring": "expiring",
+                "access_expired_refreshable": "refresh_needed",
+                "access_missing_refreshable": "refresh_needed",
+            }.get(state)
             if status:
                 expires_at = auth.get("access_expires_at")
                 result[provider_id] = {"status": status, "remaining": max(0, expires_at - time.time()) if expires_at else None}

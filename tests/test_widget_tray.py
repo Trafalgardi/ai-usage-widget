@@ -1,6 +1,6 @@
 import copy
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import widget
 
@@ -38,6 +38,50 @@ class TrayManagerTests(unittest.TestCase):
     def test_icon_update_is_safe_when_tray_dependencies_are_missing(self):
         with patch("widget.TRAY_AVAILABLE", False):
             widget.TrayManager()._update_icon_with_data()
+
+    def test_application_icon_remains_when_all_provider_usage_is_missing(self):
+        tray = widget.TrayManager()
+        tray.window_ref = MagicMock()
+        application_icon = MagicMock()
+        tray.icon_app = application_icon
+        with patch("widget.TRAY_AVAILABLE", True):
+            tray._update_icon_with_data()
+        self.assertIs(application_icon, tray.icon_app)
+
+    def test_minimize_hides_only_after_a_tray_icon_is_available(self):
+        tray = widget.TrayManager()
+        tray.window_ref = MagicMock()
+        with patch.object(widget, "TRAY", tray), patch("widget.TRAY_AVAILABLE", True), patch.object(
+            tray, "ensure_available", return_value=False
+        ):
+            self.assertFalse(widget.JsApi().minimize_to_tray())
+        tray.window_ref.hide.assert_not_called()
+
+        with patch.object(widget, "TRAY", tray), patch("widget.TRAY_AVAILABLE", True), patch.object(
+            tray, "ensure_available", return_value=True
+        ):
+            self.assertTrue(widget.JsApi().minimize_to_tray())
+        tray.window_ref.hide.assert_called_once()
+
+    def test_failed_application_icon_creation_leaves_window_visible(self):
+        tray = widget.TrayManager()
+        tray.window_ref = MagicMock()
+        with patch("widget.TRAY_AVAILABLE", True), patch(
+            "widget.pystray.Icon", side_effect=RuntimeError("tray unavailable")
+        ), patch.object(widget, "TRAY", tray):
+            self.assertFalse(tray.ensure_available())
+            self.assertFalse(widget.JsApi().minimize_to_tray())
+        tray.window_ref.hide.assert_not_called()
+
+    def test_show_and_exit_from_application_menu_control_window(self):
+        tray = widget.TrayManager()
+        tray.window_ref = MagicMock()
+        tray.icon_app = MagicMock()
+        tray._on_show(None, None)
+        tray._on_quit(None, None)
+        tray.window_ref.show.assert_called_once()
+        tray.window_ref.destroy.assert_called_once()
+        tray.icon_app.stop.assert_called_once()
 
 
 if __name__ == "__main__":
