@@ -20,6 +20,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from app_storage import ConfigStore
+from auth_health import inspect_claude_auth
+from session_repair import attempt_automatic_claude_recovery
 from usage_health import LastGoodUsageStore, classify_exception, usage_error
 from usage_history import HistoryStore
 from version import APP_NAME
@@ -156,56 +158,54 @@ CLAUDE_USAGE_URLS = [
 ]
 
 
-def fetch_claude():
-    result = {"id": "claude", "name": "Claude Code", "ok": False,
-              "windows": [], "meta": {}, "error": None}
+def _read_claude_credentials():
+    """Read only the access credential needed for the usage request."""
     token = None
-    cred_file = None
+    subscription = None
+    token_stale = False
     for p in CLAUDE_CRED_PATHS:
         if os.path.exists(p):
-            cred_file = p
             try:
                 with open(p, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 oauth = data.get("claudeAiOauth") or data.get("oauth") or {}
                 token = oauth.get("accessToken") or oauth.get("access_token")
-                result["meta"]["subscription"] = oauth.get("subscriptionType")
+                subscription = oauth.get("subscriptionType")
                 exp = oauth.get("expiresAt")
                 if exp and iso_to_epoch(exp) and iso_to_epoch(exp) < time.time():
-                    result["meta"]["token_stale"] = True
-            except Exception as e:
-                result["error"] = f"Не удалось прочитать {p}: {e}"
+                    token_stale = True
+            except Exception:
+                pass
             break
-    if not token:
-        result["error"] = result["error"] or (
-            "Не найден токен Claude Code (~/.claude/.credentials.json). "
-            "Открой Claude Code и выполни /login.")
-        return result
+    return token, subscription, token_stale
 
-    headers = {
+
+def _fetch_claude_usage(headers):
+    """Fetch Claude usage once, stopping immediately on an auth response."""
+    last_error = None
+    for url in CLAUDE_USAGE_URLS:
+        try:
+            return http_get_json(url, headers), None, None
+        except urllib.error.HTTPError as exc:
+            last_error = exc
+            if exc.code in (401, 403):
+                return None, last_error, exc
+        except Exception as exc:
+            last_error = exc
+    return None, last_error, None
+
+
+def _claude_headers(token):
+    return {
         "Authorization": f"Bearer {token}",
         "anthropic-beta": "oauth-2025-04-20",
         "Content-Type": "application/json",
         "Accept": "application/json",
         "User-Agent": "ai-usage-widget/1.0",
     }
-    data, last_err = None, None
-    for url in CLAUDE_USAGE_URLS:
-        try:
-            data = http_get_json(url, headers)
-            break
-        except urllib.error.HTTPError as e:
-            last_err = f"HTTP {e.code} от {url}"
-            result["usage"] = classify_exception(e)
-            if e.code in (401, 403):
-                last_err += " — сессию не удалось подтвердить"
-        except Exception as e:
-            last_err = f"{type(e).__name__}: {e}"
-            result["usage"] = classify_exception(e)
-    if data is None:
-        result["error"] = last_err or "Нет ответа от API"
-        return result
 
+
+def _parse_claude_usage(data, result):
     label_map = {
         "five_hour": ("session", "Сессия (5 ч)"),
         "seven_day": ("week", "Неделя"),
@@ -222,10 +222,68 @@ def fetch_claude():
         if pct is not None or resets is not None:
             result["windows"].append(make_window(wid, label, used_pct=pct, resets_at=resets))
 
-    # extra usage / кредиты, если сервер их отдаёт
     extra = data.get("extra_usage") or data.get("extraUsage")
     if isinstance(extra, dict):
         result["meta"]["extra_usage"] = extra
+
+
+def fetch_claude():
+    result = {"id": "claude", "name": "Claude Code", "ok": False,
+              "windows": [], "meta": {}, "error": None}
+    auth = inspect_claude_auth()
+    token, subscription, token_stale = _read_claude_credentials()
+    recovery = None
+    recovery_decided = False
+    if auth.get("state") in ("access_expired_refreshable", "access_missing_refreshable"):
+        recovery = attempt_automatic_claude_recovery(auth, trigger="auth_metadata")
+        recovery_decided = True
+        result["meta"]["session_recovery"] = (
+            "session_recovered" if recovery.get("success") else recovery.get("status")
+        )
+        if recovery.get("success"):
+            # Claude Code owns the credential rotation; re-read only after it
+            # reports recovery so the retry cannot reuse the stale access token.
+            token, subscription, token_stale = _read_claude_credentials()
+    if subscription:
+        result["meta"]["subscription"] = subscription
+    if token_stale:
+        result["meta"]["token_stale"] = True
+    if not token:
+        result["error"] = (
+            "Не найден токен Claude Code (~/.claude/.credentials.json). "
+            "Открой Claude Code и выполни /login.")
+        return result
+
+    data, error, auth_error = _fetch_claude_usage(_claude_headers(token))
+    if auth_error and not recovery_decided:
+        fresh_auth = inspect_claude_auth()
+        if fresh_auth.get("state") in ("access_expired_refreshable", "access_missing_refreshable"):
+            recovery = attempt_automatic_claude_recovery(fresh_auth, trigger=f"usage_{auth_error.code}")
+            recovery_decided = True
+            result["meta"]["session_recovery"] = (
+                "session_recovered" if recovery.get("success") else recovery.get("status")
+            )
+            if recovery.get("success"):
+                token, subscription, token_stale = _read_claude_credentials()
+                if subscription:
+                    result["meta"]["subscription"] = subscription
+                if token_stale:
+                    result["meta"]["token_stale"] = True
+                if token:
+                    data, error, auth_error = _fetch_claude_usage(_claude_headers(token))
+
+    if data is None:
+        if error:
+            result["usage"] = classify_exception(error)
+            if isinstance(error, urllib.error.HTTPError):
+                result["error"] = f"HTTP {error.code} — сессию не удалось подтвердить" if error.code in (401, 403) else f"HTTP {error.code}"
+            else:
+                result["error"] = f"{type(error).__name__}: {error}"
+        else:
+            result["error"] = "Нет ответа от API"
+        return result
+
+    _parse_claude_usage(data, result)
 
     if result["windows"]:
         result["ok"] = True
@@ -511,6 +569,7 @@ CFG = load_config()
 
 class TrayManager:
     def __init__(self):
+        self.icon_app = None
         self.icon_claude = None
         self.icon_codex = None
         self.window_ref = None
@@ -553,6 +612,9 @@ class TrayManager:
     def _update_icon_with_data(self):
         if not TRAY_AVAILABLE:
             return
+        # The application icon is deliberately independent of usage data.  A
+        # hidden window must never lose its only route back to the user.
+        self.ensure_available()
         pcts = self._get_session_pcts()
         providers = {"claude": "Claude Code", "codex": "Codex CLI"}
         icon_attrs = {"claude": "icon_claude", "codex": "icon_codex"}
@@ -581,7 +643,8 @@ class TrayManager:
                     self._create_tray_icon(pid, pname, img)
             else:
                 if icon:
-                    # Останавливаем и прячем иконку
+                    # Provider indicators are optional; the permanent app icon
+                    # remains available when a provider has no usable quota.
                     try:
                         icon.stop()
                     except Exception:
@@ -589,30 +652,82 @@ class TrayManager:
                     setattr(self, icon_attrs[pid], None)
                     setattr(self, thread_attrs[pid], None)
 
-    def _create_tray_icon(self, pid, pname, img):
+    def _menu(self):
         lang = (CFG.get("language") or "ru")[:2]
         labels = {
             "show": "Show" if lang == "en" else "Показать",
             "refresh": "Refresh" if lang == "en" else "Обновить",
             "exit": "Exit" if lang == "en" else "Выход",
         }
-        menu = pystray.Menu(
+        return pystray.Menu(
             pystray.MenuItem(labels["show"], self._on_show, default=True),
             pystray.MenuItem(labels["refresh"], self._on_refresh),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(labels["exit"], self._on_quit),
         )
+
+    def _run_icon(self, icon, attribute, thread_attribute):
+        ready = threading.Event()
+
+        def run():
+            try:
+                icon.run(setup=lambda _: ready.set())
+            except Exception:
+                # A failed backend never sets ready, so callers retain the
+                # visible application window instead of entering a dead state.
+                pass
+
+        try:
+            thread = threading.Thread(target=run, daemon=True)
+            thread.start()
+        except Exception:
+            return False
+        if not ready.wait(timeout=2):
+            try:
+                icon.stop()
+            except Exception:
+                pass
+            return False
+        setattr(self, attribute, icon)
+        setattr(self, thread_attribute, thread)
+        return True
+
+    def ensure_available(self):
+        """Ensure the permanent application tray icon is running.
+
+        This is called before hiding the WebView.  Failure is intentionally
+        observable by callers so they can leave the window visible.
+        """
+        if not TRAY_AVAILABLE or not self.window_ref:
+            return False
+        if self.icon_app:
+            return True
+        try:
+            icon = pystray.Icon(
+                "ai-cli-control-center",
+                self._create_icon_image("AI", color="#FFFFFF", outline="#2ECC40"),
+                self._build_tooltip(),
+                self._menu(),
+            )
+        except Exception:
+            return False
+        return self._run_icon(icon, "icon_app", "_thread_app")
+
+    def _create_tray_icon(self, pid, pname, img):
+        """Create an optional provider percentage indicator."""
+        try:
+            menu = self._menu()
+        except Exception:
+            return False
         name = f"ai-usage-{pid}"
-        title = pname
-        icon = pystray.Icon(name, img, title, menu)
-        t = threading.Thread(target=icon.run, daemon=True)
-        t.start()
+        try:
+            icon = pystray.Icon(name, img, pname, menu)
+        except Exception:
+            return False
         if pid == "claude":
-            self.icon_claude = icon
-            self._thread_claude = t
+            return self._run_icon(icon, "icon_claude", "_thread_claude")
         else:
-            self.icon_codex = icon
-            self._thread_codex = t
+            return self._run_icon(icon, "icon_codex", "_thread_codex")
 
     def _build_tooltip(self):
         with STATE.lock:
@@ -652,21 +767,43 @@ class TrayManager:
 
     def _on_quit(self, icon, item):
         STATE.shutdown_event.set()
+        if self.icon_app:
+            try:
+                self.icon_app.stop()
+            except Exception:
+                pass
         if self.icon_claude:
-            self.icon_claude.stop()
+            try:
+                self.icon_claude.stop()
+            except Exception:
+                pass
         if self.icon_codex:
-            self.icon_codex.stop()
+            try:
+                self.icon_codex.stop()
+            except Exception:
+                pass
+        if self.window_ref:
+            try:
+                self.window_ref.destroy()
+            except Exception:
+                pass
 
     def _on_refresh(self, icon, item):
         threading.Thread(target=refresh_all, daemon=True).start()
 
     def start(self, window):
         if not TRAY_AVAILABLE:
-            return
+            return False
         self.window_ref = window
+        return self.ensure_available()
 
     def update_tooltip(self):
         tooltip = self._build_tooltip()
+        if self.icon_app:
+            try:
+                self.icon_app.title = tooltip
+            except Exception:
+                pass
         if self.icon_claude:
             try:
                 self.icon_claude.title = tooltip
@@ -686,7 +823,7 @@ class TrayManager:
         """Send opt-in local notifications through an existing tray icon."""
         if not TRAY_AVAILABLE or not alerts:
             return
-        icon = self.icon_claude or self.icon_codex
+        icon = self.icon_app or self.icon_claude or self.icon_codex
         if not icon or not hasattr(icon, "notify"):
             return
         for alert in alerts:
@@ -924,7 +1061,7 @@ class JsApi:
             os._exit(0)
 
     def minimize_to_tray(self):
-        if TRAY_AVAILABLE and TRAY.window_ref:
+        if TRAY_AVAILABLE and TRAY.window_ref and TRAY.ensure_available():
             TRAY.hide_window()
             return True
         return False
@@ -984,6 +1121,8 @@ def main():
         threading.Timer(3, window.destroy).start()
     webview.start(debug=False)
     STATE.shutdown_event.set()
+    if TRAY.icon_app:
+        TRAY.icon_app.stop()
     if TRAY.icon_claude:
         TRAY.icon_claude.stop()
     if TRAY.icon_codex:

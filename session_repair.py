@@ -8,6 +8,7 @@ explicit because it consumes a very small amount of quota.
 """
 
 import threading
+import time
 
 from auth_health import inspect_claude_auth
 from provider_health import discover_cli
@@ -15,6 +16,87 @@ from process_runner import run_process
 
 
 _REPAIR_LOCK = threading.Lock()
+_AUTOMATIC_RECOVERY_LOCK = threading.Lock()
+_AUTOMATIC_RECOVERY_COOLDOWN_SEC = 15 * 60
+_last_failed_automatic_recovery = {"signature": None, "at": 0.0}
+
+RECOVERABLE_CLAUDE_AUTH_STATES = (
+    "access_expired_refreshable",
+    "access_missing_refreshable",
+)
+
+
+def _credential_signature(auth):
+    """Return non-secret metadata identifying one recoverable auth episode."""
+    auth = auth or {}
+    return (
+        auth.get("credential_path"),
+        auth.get("state"),
+        auth.get("access_expires_at"),
+        auth.get("refresh_expires_at"),
+    )
+
+
+def attempt_automatic_claude_recovery(auth, trigger="auth_metadata", now=None):
+    """Run at most one CLI repair per unchanged failed credential episode.
+
+    The application never exchanges a refresh token itself.  This guard sits
+    above :func:`refresh_claude_session` so a periodic usage refresh cannot
+    repeatedly spend quota after a failed CLI recovery.  Explicit UI repair
+    remains available through ``refresh_claude_session`` and intentionally is
+    not subject to this automatic-retry cooldown.
+    """
+    auth = auth or {}
+    if auth.get("state") not in RECOVERABLE_CLAUDE_AUTH_STATES:
+        return {
+            "success": False,
+            "status": "recovery_not_applicable",
+            "provider_id": "claude",
+            "attempted": False,
+            "auth": auth,
+        }
+    if not _AUTOMATIC_RECOVERY_LOCK.acquire(blocking=False):
+        return {
+            "success": False,
+            "status": "recovery_already_running",
+            "provider_id": "claude",
+            "attempted": False,
+            "auth": auth,
+        }
+
+    try:
+        timestamp = time.time() if now is None else float(now)
+        signature = _credential_signature(auth)
+        if (
+            _last_failed_automatic_recovery["signature"] == signature
+            and timestamp - _last_failed_automatic_recovery["at"] < _AUTOMATIC_RECOVERY_COOLDOWN_SEC
+        ):
+            return {
+                "success": False,
+                "status": "recovery_cooldown",
+                "provider_id": "claude",
+                "attempted": False,
+                "auth": auth,
+            }
+
+        result = dict(refresh_claude_session())
+        result["attempted"] = True
+        result["trigger"] = trigger
+        if result.get("success"):
+            _last_failed_automatic_recovery["signature"] = None
+            _last_failed_automatic_recovery["at"] = 0.0
+        else:
+            _last_failed_automatic_recovery["signature"] = signature
+            _last_failed_automatic_recovery["at"] = timestamp
+        return result
+    finally:
+        _AUTOMATIC_RECOVERY_LOCK.release()
+
+
+def reset_automatic_recovery_for_tests():
+    """Reset process-local automatic recovery state for deterministic tests."""
+    _last_failed_automatic_recovery["signature"] = None
+    _last_failed_automatic_recovery["at"] = 0.0
 
 
 def refresh_claude_session(timeout=45):
@@ -33,9 +115,7 @@ def refresh_claude_session(timeout=45):
 
     try:
         before = inspect_claude_auth()
-        if before.get("state") not in (
-            "access_expired_refreshable",
-            "access_missing_refreshable",
+        if before.get("state") not in RECOVERABLE_CLAUDE_AUTH_STATES + (
             "session_present_metadata_incomplete",
         ):
             return {

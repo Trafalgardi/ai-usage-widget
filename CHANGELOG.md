@@ -2,6 +2,14 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [2.1.1] - 2026-09-02
+
+### Fixed
+
+- Recovered refreshable Claude Code access-token failures through the official CLI path, then retried usage once with freshly read credentials.
+- Prevented the hidden-window/no-tray dead state by keeping a permanent application tray icon independent of provider usage data.
+- Hardened automatic session recovery with a single-flight guard and credential-state cooldown, and added regression coverage for recovery and tray lifecycle failures.
+
 ## [2.1.0] - 2026-08-25
 
 ### Added
