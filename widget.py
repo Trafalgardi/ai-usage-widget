@@ -668,13 +668,25 @@ class TrayManager:
 
     def _run_icon(self, icon, attribute, thread_attribute):
         ready = threading.Event()
+        started = {"visible": False}
+
+        def setup(running_icon):
+            try:
+                # Supplying a custom pystray setup callback disables its
+                # default callback, whose job is to make the icon visible.
+                # Mark the icon ready only after it has actually been
+                # published to the notification area.
+                running_icon.visible = True
+                started["visible"] = True
+            finally:
+                ready.set()
 
         def run():
             try:
-                icon.run(setup=lambda _: ready.set())
+                icon.run(setup=setup)
             except Exception:
-                # A failed backend never sets ready, so callers retain the
-                # visible application window instead of entering a dead state.
+                # Callers verify both setup completion and actual visibility,
+                # so a failed backend cannot hide the application window.
                 pass
 
         try:
@@ -682,7 +694,7 @@ class TrayManager:
             thread.start()
         except Exception:
             return False
-        if not ready.wait(timeout=2):
+        if not ready.wait(timeout=2) or not started["visible"]:
             try:
                 icon.stop()
             except Exception:

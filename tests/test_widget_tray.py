@@ -48,6 +48,26 @@ class TrayManagerTests(unittest.TestCase):
             tray._update_icon_with_data()
         self.assertIs(application_icon, tray.icon_app)
 
+    def test_icon_is_published_before_it_is_reported_available(self):
+        class FakeIcon:
+            def __init__(self):
+                self.visible = False
+                self.stopped = False
+
+            def run(self, setup):
+                setup(self)
+
+            def stop(self):
+                self.stopped = True
+
+        tray = widget.TrayManager()
+        icon = FakeIcon()
+
+        self.assertTrue(tray._run_icon(icon, "icon_app", "_thread_app"))
+        self.assertTrue(icon.visible)
+        self.assertIs(icon, tray.icon_app)
+        self.assertFalse(icon.stopped)
+
     def test_minimize_hides_only_after_a_tray_icon_is_available(self):
         tray = widget.TrayManager()
         tray.window_ref = MagicMock()
