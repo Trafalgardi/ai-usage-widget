@@ -153,7 +153,7 @@ Key modules:
 The script creates an isolated `.venv-build`, installs pinned dependencies, runs all tests, builds with the checked-in PyInstaller spec, smoke-starts the EXE, and creates:
 
 - `dist/AI-CLI-Control-Center.exe`
-- `dist/AI-CLI-Control-Center-v2.1.1-windows-x64.zip`
+- `dist/AI-CLI-Control-Center-v2.1.2-windows-x64.zip`
 - `dist/SHA256SUMS.txt`
 
 CI performs the same Windows build. The manual release-artifact workflow also creates a CycloneDX SBOM and GitHub build-provenance attestation; it does not publish a GitHub Release.

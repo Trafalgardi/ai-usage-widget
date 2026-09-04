@@ -49,6 +49,6 @@ jobs:
           name: ai-cli-control-center-windows
           path: |
             dist/AI-CLI-Control-Center.exe
-            dist/AI-CLI-Control-Center-v2.1.1-windows-x64.zip
+            dist/AI-CLI-Control-Center-v2.1.2-windows-x64.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error

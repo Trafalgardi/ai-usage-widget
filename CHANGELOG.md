@@ -2,6 +2,13 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [2.1.2] - 2026-09-04
+
+### Fixed
+
+- Restored tray icon publication after the v2.1.1 readiness guard replaced pystray's default setup callback.
+- Kept the window visible unless the application tray icon has actually been published.
+
 ## [2.1.1] - 2026-09-02
 
 ### Fixed

@@ -971,7 +971,7 @@ setTimeout(() => {
   const demo = new URLSearchParams(location.search).get("demo") || "ready";
   const missing = demo === "missing";
   const degraded = demo === "degraded";
-  DATA = {contract_version:1,app_version:"2.1.1",startup:{supported:true,enabled:false},_config:{language:"en",refresh_interval_sec:60,window:{width:380,height:600,on_top:true},history:{enabled:true,retention_days:30},alerts:{enabled:false,remaining_threshold_pct:15,cooldown_sec:3600}},updated_at: Date.now()/1000, providers: {
+  DATA = {contract_version:1,app_version:"2.1.2",startup:{supported:true,enabled:false},_config:{language:"en",refresh_interval_sec:60,window:{width:380,height:600,on_top:true},history:{enabled:true,retention_days:30},alerts:{enabled:false,remaining_threshold_pct:15,cooldown_sec:3600}},updated_at: Date.now()/1000, providers: {
     claude:{id:"claude",name:"Claude Code",ok:true,meta:{subscription:"max"},windows:[
       {id:"session",label:"Сессия (5 ч)",remaining_pct:64,resets_at:Date.now()/1000+7620},
       {id:"week",label:"Неделя",remaining_pct:41,resets_at:Date.now()/1000+3600*52},
@@ -992,7 +992,7 @@ setTimeout(() => {
     const panel = $("#diagnostics-preview");
     if(panel) panel.style.display = "block";
     const text = $("#diagnostics-text");
-    if(text) text.value = `AI CLI Control Center diagnostics (redacted)\n{\n  "app": {"version": "2.1.1"},\n  "os": {"system": "Windows", "release": "11", "architecture": "AMD64"},\n  "providers": {\n    "claude": {"discovery_status": "installed", "cli_version": "2.1.226", "path_conflict_category": "none"},\n    "codex": {"discovery_status": "installed", "cli_version": "codex-cli 1.2.0", "path_conflict_category": "none"}\n  }\n}`;
+    if(text) text.value = `AI CLI Control Center diagnostics (redacted)\n{\n  "app": {"version": "2.1.2"},\n  "os": {"system": "Windows", "release": "11", "architecture": "AMD64"},\n  "providers": {\n    "claude": {"discovery_status": "installed", "cli_version": "2.1.226", "path_conflict_category": "none"},\n    "codex": {"discovery_status": "installed", "cli_version": "codex-cli 1.2.0", "path_conflict_category": "none"}\n  }\n}`;
   }
 }, 800);
 </script>
