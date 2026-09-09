@@ -47,6 +47,7 @@ HISTORY_PATH = os.path.join(DATA_DIR, "history.json")
 DEFAULT_CONFIG = {
     "language": "en",
     "refresh_interval_sec": 60,
+    "tray_limits": {"claude": "session", "codex": "session"},
     "history": {"enabled": True, "retention_days": 30},
     "alerts": {"enabled": False, "remaining_threshold_pct": 15, "cooldown_sec": 3600},
     "window": {"x": None, "y": None, "width": 380, "height": 600, "on_top": True},
@@ -596,7 +597,44 @@ class TrayManager:
         
         return img
 
-    def _get_session_pcts(self):
+    def _selected_limit(self, provider_id):
+        limits = CFG.get("tray_limits") or {}
+        value = limits.get(provider_id) if isinstance(limits, dict) else None
+        return value if value in ("session", "week") else "session"
+
+    def _set_limit(self, provider_id, window_id):
+        if provider_id not in ("claude", "codex") or window_id not in ("session", "week"):
+            return False
+        updated = copy.deepcopy(CFG)
+        updated["tray_limits"] = {pid: self._selected_limit(pid) for pid in ("claude", "codex")}
+        updated["tray_limits"][provider_id] = window_id
+        if not save_config(updated):
+            return False
+        CFG["tray_limits"] = updated["tray_limits"]
+        self._update_icon_with_data()
+        self.update_tooltip()
+        for icon in (self.icon_app, self.icon_claude, self.icon_codex):
+            if icon:
+                icon.update_menu()
+        return True
+
+    def _limit_menu(self, provider_id, english):
+        def choice(window_id, label):
+            def select(icon, item):
+                if not self._set_limit(provider_id, window_id) and icon:
+                    icon.notify("Could not save tray setting" if english else "Не удалось сохранить настройку трея", APP_NAME)
+
+            return pystray.MenuItem(
+                label, select, radio=True,
+                checked=lambda item: self._selected_limit(provider_id) == window_id,
+            )
+
+        return pystray.Menu(
+            choice("session", "5-hour limit" if english else "Пятичасовой лимит"),
+            choice("week", "Weekly limit" if english else "Недельный лимит"),
+        )
+
+    def _get_tray_pcts(self):
         with STATE.lock:
             snap = copy.deepcopy(STATE.snapshot)
         result = {}
@@ -604,7 +642,8 @@ class TrayManager:
             p = snap["providers"].get(pid)
             has_usage = p and (p.get("ok") or (p.get("usage") or {}).get("stale"))
             if has_usage:
-                w = next((x for x in p.get("windows", []) if x["id"] == "session"), None)
+                w = next((x for x in p.get("windows", []) if x["id"] == self._selected_limit(pid)), None)
+                result[pid] = None
                 if w and w.get("remaining_pct") is not None:
                     result[pid] = round(w["remaining_pct"], 1)
         return result
@@ -615,18 +654,18 @@ class TrayManager:
         # The application icon is deliberately independent of usage data.  A
         # hidden window must never lose its only route back to the user.
         self.ensure_available()
-        pcts = self._get_session_pcts()
+        pcts = self._get_tray_pcts()
         providers = {"claude": "Claude Code", "codex": "Codex CLI"}
         icon_attrs = {"claude": "icon_claude", "codex": "icon_codex"}
         thread_attrs = {"claude": "_thread_claude", "codex": "_thread_codex"}
         
         for pid, pname in providers.items():
             pct = pcts.get(pid)
-            has_data = pct is not None
+            has_data = pid in pcts
             icon = getattr(self, icon_attrs[pid], None)
             
             if has_data:
-                text = f"{int(pct):02d}"
+                text = f"{int(pct):02d}" if pct is not None else "—"
                 if pid == "claude":
                     img = self._create_icon_image(text, color="#D97757")
                 else:
@@ -662,6 +701,11 @@ class TrayManager:
         return pystray.Menu(
             pystray.MenuItem(labels["show"], self._on_show, default=True),
             pystray.MenuItem(labels["refresh"], self._on_refresh),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Tray limit" if lang == "en" else "Лимит в трее", pystray.Menu(
+                pystray.MenuItem("Claude", self._limit_menu("claude", lang == "en")),
+                pystray.MenuItem("Codex", self._limit_menu("codex", lang == "en")),
+            )),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(labels["exit"], self._on_quit),
         )
@@ -733,7 +777,7 @@ class TrayManager:
             return False
         name = f"ai-usage-{pid}"
         try:
-            icon = pystray.Icon(name, img, pname, menu)
+            icon = pystray.Icon(name, img, self._build_tooltip(), menu)
         except Exception:
             return False
         if pid == "claude":
@@ -746,31 +790,31 @@ class TrayManager:
             snap = copy.deepcopy(STATE.snapshot)
         if not snap.get("updated_at"):
             return APP_NAME
+        # Windows NOTIFYICONDATA allows only 127 visible tooltip characters.
+        # Keep both windows and reset countdowns compact enough for both providers.
+        english = (CFG.get("language") or "ru")[:2] == "en"
         lines = [APP_NAME]
+        now = time.time()
         for pid, pname in [("claude", "Claude"), ("codex", "Codex")]:
             p = snap["providers"].get(pid)
             has_usage = p and (p.get("ok") or (p.get("usage") or {}).get("stale"))
-            if not has_usage:
-                lines.append(f"{pname}: —")
-                continue
-            w = next((x for x in p.get("windows", []) if x["id"] == "session"), None)
-            if not w or w.get("remaining_pct") is None:
-                lines.append(f"{pname}: —")
-                continue
-            pct = round(w["remaining_pct"], 1)
-            resets = w.get("resets_at")
-            if resets:
-                secs = max(0, int(resets - time.time()))
-                h, rem = divmod(secs, 3600)
-                m = rem // 60
-                lang = (CFG.get("language") or "ru")[:2]
-                hu = "h" if lang == "en" else "ч"
-                mu = "m" if lang == "en" else "м"
-                reset_label = "resets in" if lang == "en" else "сброс"
-                reset_str = f"{h}{hu} {m}{mu}" if h > 0 else f"{m}{mu}"
-                lines.append(f"{pname}: {pct}% ({reset_label} {reset_str})")
-            else:
-                lines.append(f"{pname}: {pct}%")
+            windows = {w["id"]: w for w in p.get("windows", [])} if has_usage else {}
+            for wid, label in (("session", "5h" if english else "5ч"),
+                               ("week", "7d" if english else "7д")):
+                w = windows.get(wid) or {}
+                pct = w.get("remaining_pct")
+                value = f"{pct:.1f}".rstrip("0").rstrip(".") if pct is not None else None
+                remaining = f"{value}%" if value is not None else "—"
+                reset = ""
+                if w.get("resets_at"):
+                    minutes = max(0, int((w["resets_at"] - now) / 60))
+                    hours, minutes = divmod(minutes, 60)
+                    days, hours = divmod(hours, 24)
+                    du, hu, mu = ("d", "h", "m") if english else ("д", "ч", "м")
+                    duration = (f"{min(days, 99)}{du}{hours}{hu}" if days else
+                                f"{hours}{hu}{minutes}{mu}" if hours else f"{minutes}{mu}")
+                    reset = f" ({duration})"
+                lines.append(f"{pname} {label}: {remaining}{reset}")
         return "\n".join(lines)
 
     def _on_show(self, icon, item):
@@ -1041,6 +1085,10 @@ class JsApi:
             # Обновить трей при смене языка
             if CFG.get("language", "ru") != old_lang:
                 TRAY.update_tooltip()
+                for icon in (TRAY.icon_app, TRAY.icon_claude, TRAY.icon_codex):
+                    if icon:
+                        icon.menu = TRAY._menu()
+                        icon.update_menu()
             return True
         except Exception as e:
             return str(e)

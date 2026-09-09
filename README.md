@@ -19,6 +19,8 @@ AI CLI Control Center is an independent, open-source Windows companion for **Cla
 3. If needed, choose **Install**, **Refresh session**, or **Sign in**. Actions use the provider's official installer or discovered CLI executable.
 4. Leave the Control Center open or minimize it to the tray to monitor session and weekly limits.
 
+Hover over any tray icon to see the remaining five-hour and weekly percentages for both providers, with reset countdowns in parentheses. Right-click any tray icon and open **Tray limit → Claude / Codex** to choose **5-hour limit** or **Weekly limit** for each provider's number. Choices are saved independently and restored on restart. A dash means the selected limit is unavailable.
+
 No separate project account is required. Windows may show a SmartScreen warning until release binaries are code-signed; verify the checksum and GitHub provenance before running an unsigned build.
 
 ## What it does

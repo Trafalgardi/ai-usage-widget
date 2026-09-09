@@ -2,6 +2,18 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [2.2.0] - 2026-09-09
+
+### Added
+
+- Tray tooltips show both five-hour and weekly remaining limits with compact reset countdowns.
+- Choose the tray indicator's five-hour or weekly limit independently for Claude and Codex through the tray menu; choices persist across restarts.
+- English and Russian tray controls, with a dash when the selected limit is unavailable.
+
+### Fixed
+
+- Refresh tray menu translations immediately when the application language changes.
+
 ## [2.1.2] - 2026-09-04
 
 ### Fixed
