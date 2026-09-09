@@ -58,3 +58,22 @@ the public EXE digest, tag, commit, GitHub-hosted runner, and workflow run above
 the latest-release redirect, direct EXE/checksum links, GitHub Pages, and all
 three new v2.1 screenshots returned HTTP 200. The existing v2.0.0 release and
 the owner's running copy were not changed or stopped.
+
+
+## Public v2.2.0 audit — 2026-09-09
+
+- Release source: annotated tag `v2.2.0`, commit `8cb1fc0fd62047d12835893229868f6f9b6d8596`.
+- Windows/Linux tests and Windows build passed in workflow `34324968455` (71 unit tests).
+- Release workflow `34324982805` passed build, packaged headless smoke, SBOM, provenance, and artifact upload.
+- Local Python 3.12 production build and hidden WebView smoke also passed. English/Russian tray menu switching was checked.
+- Downloaded workflow EXE passed hidden WebView smoke; ZIP-extracted EXE passed headless smoke. SHA256SUMS matched both artifacts.
+- `gh attestation verify` succeeded with `--source-ref refs/tags/v2.2.0`.
+- All five uploaded asset digests matched the verified files before publication. The release is published and marked Latest.
+- Microsoft Defender verification was unavailable on this host: `Get-MpComputerStatus` returned `Provider load failure`. No antivirus scan result is claimed for this release. The executable remains unsigned.
+
+```
+5e7a2bf85f088554c5421cfa0e13acbf9491ad43c7df6788e8ac9d28dc39088f  AI-CLI-Control-Center.exe
+818b2fe54a5fef81045288d69d952df202826e31b31ea56a71054d3657a0d980  AI-CLI-Control-Center-v2.2.0-windows-x64.zip
+```
+
+[Download v2.2.0](https://github.com/Trafalgardi/ai-usage-widget/releases/tag/v2.2.0).
