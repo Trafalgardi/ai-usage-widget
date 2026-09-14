@@ -37,11 +37,28 @@ No separate project account is required. Windows may show a SmartScreen warning 
 | Stale last-good usage during temporary failures | Yes | Yes |
 | Private local history and burn rate | Yes | Yes |
 | Conservative limit forecast | Yes | Yes |
+| Local input/output and cache token totals | Yes | Yes |
+| Collapsible daily/7-day token cards and API cost estimates | Yes | Yes |
 | Opt-in cooldown-aware local alerts | Yes | Yes |
 
 ![Claude Provider Health ready state](docs/assets/provider-health-ready.png)
 
 ## Daily usage intelligence, kept local
+
+Each provider's **This machine · tokens** card starts collapsed with input/output
+totals for today and seven days. Click to expand cache counts, model names and
+estimated API-equivalent cost. The cost uses a dated standard short-context rate
+table; it is not a subscription bill or percentage of a plan's quota. Unknown
+model rates are explicitly excluded. Input includes cached input; reasoning is
+not added a second time to output.
+
+Accounting reads available local CLI logs, including subagents and archived Codex
+sessions. It can be disabled separately in Settings. Imported logs can contain
+another machine's historical usage; cross-machine synchronization is not included
+yet. See [accounting details and comparison plan](docs/local-token-accounting.md).
+
+Codex weekly-only plans display **Week**, including in the tray, without a
+phantom five-hour session.
 
 Successful refreshes can add a small normalized snapshot to a bounded local history. After enough comparable samples, provider cards show burn rate, pace to reset, forecast confidence, and projected exhaustion only when the evidence supports it. A single sample is reported as unavailable rather than turned into a guess.
 
@@ -155,7 +172,7 @@ Key modules:
 The script creates an isolated `.venv-build`, installs pinned dependencies, runs all tests, builds with the checked-in PyInstaller spec, smoke-starts the EXE, and creates:
 
 - `dist/AI-CLI-Control-Center.exe`
-- `dist/AI-CLI-Control-Center-v2.2.0-windows-x64.zip`
+- `dist/AI-CLI-Control-Center-v2.3.0-windows-x64.zip`
 - `dist/SHA256SUMS.txt`
 
 CI performs the same Windows build. The manual release-artifact workflow also creates a CycloneDX SBOM and GitHub build-provenance attestation; it does not publish a GitHub Release.

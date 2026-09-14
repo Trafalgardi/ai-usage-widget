@@ -9,6 +9,9 @@ AI CLI Control Center has no project-operated server, account system, analytics,
 - Application settings: `%LOCALAPPDATA%\AI CLI Control Center\config.json` for packaged builds, or `config.json` beside the source entry point during development
 - Local history: `%LOCALAPPDATA%\AI CLI Control Center\history.json` when history is enabled
 - CLI executable paths and version output from local discovery commands
+- Local token accounting reads usage metadata from `CLAUDE_CONFIG_DIR/projects` (default `~/.claude/projects`) and `CODEX_HOME/sessions` and `CODEX_HOME/archived_sessions` (default `~/.codex`). It includes nested subagent logs.
+
+Local token accounting can be disabled independently in Settings. It reads JSONL records but retains only token counts, model names, timestamps and hashed deduplication keys in memory; conversation content is not retained, written, or sent anywhere. The UI receives aggregates for today and the last seven local calendar days. No new token accounting database is created. Existing CLI logs are never changed or deleted. After restarting, statistics are rebuilt from the available logs; deleting logs removes them from this view. Imported/copied sessions cannot be reliably attributed to the computer that originally generated them. Quota history and redacted diagnostics do not include token accounting data.
 
 Credential values are used in memory for provider usage requests. Provider Health exposes only non-secret metadata, such as whether a token exists, expiry timestamps, scopes, subscription type, and a home-relative credential location. It does not include access or refresh token values.
 

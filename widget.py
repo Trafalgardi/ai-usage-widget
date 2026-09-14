@@ -8,6 +8,7 @@ belongs in the extracted health, action, storage, and UI bridge modules.
 import base64
 import copy
 import json
+import math
 import os
 import subprocess
 import sys
@@ -24,6 +25,7 @@ from auth_health import inspect_claude_auth
 from session_repair import attempt_automatic_claude_recovery
 from usage_health import LastGoodUsageStore, classify_exception, usage_error
 from usage_history import HistoryStore
+from local_usage import LocalUsageCollector
 from version import APP_NAME
 
 try:
@@ -49,6 +51,7 @@ DEFAULT_CONFIG = {
     "refresh_interval_sec": 60,
     "tray_limits": {"claude": "session", "codex": "session"},
     "history": {"enabled": True, "retention_days": 30},
+    "local_usage": {"enabled": True},
     "alerts": {"enabled": False, "remaining_threshold_pct": 15, "cooldown_sec": 3600},
     "window": {"x": None, "y": None, "width": 380, "height": 600, "on_top": True},
     "opencode": {
@@ -383,17 +386,29 @@ def fetch_codex():
             secs = pick(obj, "resets_in_seconds", "reset_after_seconds")
             if secs is not None:
                 resets = time.time() + float(secs)
-        # длина окна помогает подписать: минуты
+        # Primary is a position, not a five-hour guarantee (e.g. Pro Lite).
+        seconds = pick(obj, "limit_window_seconds", "window_seconds")
         mins = pick(obj, "window_minutes", "limit_window_minutes")
+        try:
+            duration = float(seconds) if seconds is not None else float(mins) * 60
+            if not math.isfinite(duration) or duration <= 0:
+                duration = None
+        except (TypeError, ValueError):
+            duration = None
         label = fallback_label
-        if mins:
-            mins = float(mins)
-            if mins <= 6 * 60:
-                label = "Сессия (5 ч)"
-            elif mins >= 6.5 * 24 * 60:
-                label = "Неделя"
+        if duration == 5 * 3600:
+            wid, label = "session", "Сессия (5 ч)"
+        elif duration == 7 * 24 * 3600:
+            wid, label = "week", "Неделя"
+        elif duration is not None:
+            wid, label = f"window_{int(duration)}s", f"{duration / 3600:g} h"
+        else:
+            # Unknown duration must not masquerade as a known billing window.
+            wid, label = f"{wid}_unknown", "Лимит"
         if pct is not None or resets is not None:
-            result["windows"].append(make_window(wid, label, used_pct=pct, resets_at=resets))
+            window = make_window(wid, label, used_pct=pct, resets_at=resets)
+            window["duration_seconds"] = duration
+            result["windows"].append(window)
 
     add_window(rl.get("primary_window") or rl.get("primary"), "session", "Сессия (5 ч)")
     add_window(rl.get("secondary_window") or rl.get("secondary"), "week", "Неделя")
@@ -600,7 +615,15 @@ class TrayManager:
     def _selected_limit(self, provider_id):
         limits = CFG.get("tray_limits") or {}
         value = limits.get(provider_id) if isinstance(limits, dict) else None
+        if provider_id == "codex" and self._codex_week_only():
+            return "week"
         return value if value in ("session", "week") else "session"
+
+    def _codex_week_only(self):
+        with STATE.lock:
+            windows = (STATE.snapshot.get("providers", {}).get("codex") or {}).get("windows", [])
+            return (any(w.get("id") == "week" and w.get("duration_seconds") == 604800 for w in windows)
+                    and not any(w.get("id") == "session" for w in windows))
 
     def _set_limit(self, provider_id, window_id):
         if provider_id not in ("claude", "codex") or window_id not in ("session", "week"):
@@ -627,6 +650,8 @@ class TrayManager:
             return pystray.MenuItem(
                 label, select, radio=True,
                 checked=lambda item: self._selected_limit(provider_id) == window_id,
+                visible=lambda item: not (provider_id == "codex" and window_id == "session"
+                                           and self._codex_week_only()),
             )
 
         return pystray.Menu(
@@ -801,6 +826,8 @@ class TrayManager:
             windows = {w["id"]: w for w in p.get("windows", [])} if has_usage else {}
             for wid, label in (("session", "5h" if english else "5ч"),
                                ("week", "7d" if english else "7д")):
+                if pid == "codex" and wid == "session" and self._codex_week_only():
+                    continue
                 w = windows.get(wid) or {}
                 pct = w.get("remaining_pct")
                 value = f"{pct:.1f}".rstrip("0").rstrip(".") if pct is not None else None
@@ -898,6 +925,7 @@ class TrayManager:
 TRAY = TrayManager()
 LAST_GOOD_USAGE = LastGoodUsageStore()
 HISTORY_STORE = HistoryStore(HISTORY_PATH)
+LOCAL_USAGE = LocalUsageCollector()
 
 
 def refresh_all():
@@ -924,8 +952,13 @@ def refresh_all():
                 providers[name] = LAST_GOOD_USAGE.apply(provider)
         captured_at = time.time()
         insights = HISTORY_STORE.process(providers, CFG, captured_at)
+        try:
+            local_usage = LOCAL_USAGE.collect(enabled=CFG.get("local_usage", {}).get("enabled", True))
+        except Exception:
+            local_usage = {"enabled": True, "state": "unavailable"}
         with STATE.lock:
-            STATE.snapshot = {"updated_at": captured_at, "providers": providers, "insights": insights}
+            STATE.snapshot = {"updated_at": captured_at, "providers": providers, "insights": insights,
+                              "local_usage": local_usage}
         TRAY.update_tooltip()
         TRAY._update_icon_with_data()
         TRAY.notify_alerts(insights.get("alerts") or [])
@@ -954,6 +987,8 @@ class JsApi:
         except Exception:
             snap["on_top"] = True
         snap["_config"] = copy.deepcopy(CFG)
+        if not (CFG.get("local_usage") or {}).get("enabled", True):
+            snap["local_usage"] = {"enabled": False}
         return snap
 
     def refresh_now(self):

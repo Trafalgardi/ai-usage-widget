@@ -158,6 +158,27 @@
   .provider-health .health-state.warn,.provider-health .health-warning{color:#f0b35e}
   .provider-health .health-meta{margin-top:4px;color:#92929b;word-break:break-word}
   .provider-health .health-warning{margin-top:6px}
+  .health-panel{margin-top:18px;padding:12px;border:1px solid #34343a;border-radius:9px;background:#111114;color:#ececf1;font-size:11px}
+  .health-panel .health-head{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}
+  .health-panel .health-line{line-height:1.7;color:#aaa;overflow-wrap:anywhere}
+  .health-panel b{color:#eee;font-weight:500}
+  .health-panel summary{cursor:pointer;color:#999;margin-top:12px}
+  .health-panel .privacy-note{color:#aaa}
+  .health-panel > .usage-summary{margin:0;color:inherit;list-style:none}
+  .usage-summary::-webkit-details-marker{display:none}
+  .usage-summary-title{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .usage-chevron{display:inline-block}
+  .local-usage[open] .usage-chevron{transform:rotate(90deg)}
+  .usage-summary:focus-visible{outline:2px solid var(--cl-accent);outline-offset:4px;border-radius:2px}
+  .usage-compact{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin-top:7px;font-size:10.5px;font-variant-numeric:tabular-nums}
+  .usage-compact .usage-values{text-align:right}
+  .local-usage[open] .usage-compact{display:none}
+  .th-claude .health-panel,.th-claude .provider-health{background:#eee8dc;border-color:#d7cdbc;color:var(--cl-ink)}
+  .th-claude .health-panel .health-line,.th-claude .health-panel .privacy-note,
+  .th-claude .health-panel summary,.th-claude .provider-health .health-meta{color:#655c4e}
+  .th-claude .health-panel b,.th-claude .provider-health strong{color:var(--cl-ink)}
+  .th-claude .provider-health .health-state{color:#286342}
+  .th-claude .provider-health .health-state.warn,.th-claude .provider-health .health-warning{color:#854515}
   .provider-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
   .provider-actions .login-btn{width:auto;flex:1;margin-top:0;min-width:110px;padding:8px 10px}
   .usage-insight{margin-top:7px;padding:7px 9px;border-radius:7px;background:rgba(128,128,128,.10);
@@ -387,6 +408,7 @@ const L10N = {
     "Неделя · Sonnet": "Week · Sonnet",
     "Неделя · приложения": "Week · apps",
     "Месяц": "Month",
+    "Лимит": "Usage limit",
     // перевод ошибок из widget.py
     "Внутренняя ошибка:\n": "Internal error:\n",
     "Не найден токен Claude Code": "Claude Code token not found",
@@ -530,6 +552,39 @@ function renderOverview(){
 }
 
 /* ---------- детальная страница ---------- */
+function renderLocalUsage(id){
+  const ru = LANG === 'ru';
+  const usage = DATA?.local_usage;
+  if(usage?.enabled === false) return '';
+  const provider = usage?.providers?.[id];
+  const title = ru ? 'Эта машина · токены' : 'This machine · tokens';
+  if(!provider) return `<div class="health-panel"><strong>${title}</strong><p class="privacy-note">${ru ? 'Локальная статистика недоступна' : 'Local usage unavailable'}</p></div>`;
+  if(provider.state === 'no_data') return `<div class="health-panel"><strong>${title}</strong><p class="privacy-note">${ru ? 'В локальных журналах нет расхода за последние 7 дней.' : 'No usage found in local logs for the last 7 days.'}</p></div>`;
+  const number = n => Number(n || 0).toLocaleString(ru ? 'ru-RU' : 'en-US');
+  const expanded = document.querySelector(`#page-${id} .local-usage`)?.open === true;
+  const compact = n => new Intl.NumberFormat('en-US', {notation:'compact',maximumFractionDigits:1}).format(Number(n || 0));
+  let html = `<details class="health-panel local-usage" ${expanded ? 'open' : ''}><summary class="usage-summary"><span class="usage-summary-title"><strong>${title}</strong><span class="usage-chevron" aria-hidden="true">▸</span></span><div class="usage-compact">`;
+  for(const [key,label] of [['today',ru ? 'Сегодня' : 'Today'],['seven_days',ru ? '7 дней' : '7 days']]){
+    const s = provider[key];
+    if(!s) continue;
+    html += `<span>${label}</span><span class="usage-values" title="Input: ${number(s.input_tokens)} · Output: ${number(s.output_tokens)}">Input <b>${compact(s.input_tokens)}</b> · Output <b>${compact(s.output_tokens)}</b></span>`;
+  }
+  html += `</div></summary><div class="usage-expanded">`;
+  for(const [key, label] of [['today', ru ? 'Сегодня' : 'Today'], ['seven_days', ru ? '7 дней, включая сегодня' : '7 days, including today']]){
+    const s = provider[key];
+    if(!s) continue;
+    const cost = s.estimated_usd == null ? '—' : `≈ $${Number(s.estimated_usd).toFixed(2)}`;
+    html += `<div style="margin-top:12px"><div class="health-head"><strong>${label}</strong><span>${cost}${s.unpriced_events && s.estimated_usd != null ? ' *' : ''}</span></div>
+      <div class="health-line">Input: <b>${number(s.input_tokens)}</b> · Output: <b>${number(s.output_tokens)}</b></div>
+      <div class="health-line">${ru ? 'В input: чтение кэша' : 'Within input: cache read'} ${number(s.cache_read_tokens)} · ${ru ? 'запись' : 'write'} ${number(s.cache_write_tokens)}</div>
+      ${s.unpriced_events ? `<div class="privacy-note">${ru ? 'Нет ставки для событий:' : 'Events without a rate:'} ${number(s.unpriced_events)}. ${ru ? 'Они исключены из стоимости.' : 'Excluded from cost.'}</div>` : ''}
+      <div class="privacy-note" style="overflow-wrap:anywhere">${s.models.map(esc).join(', ')}</div></div>`;
+  }
+  if(provider.state === 'partial') html += `<p class="privacy-note">${ru ? 'Неполные данные: часть записей или файлов не прочитана.' : 'Partial data: some records or files could not be read.'}</p>`;
+  html += `<div class="privacy-note">${ru ? '≈ Эквивалент API, не счёт за подписку' : '≈ API equivalent, not a subscription bill'}</div><details><summary>${ru ? 'Как считается' : 'How it is counted'}</summary><p class="privacy-note">${ru ? 'Стандартные API-ставки для короткого контекста от' : 'Standard short-context API rates dated'} ${esc(usage.pricing_date)}. ${ru ? 'Без надбавок fast/long-context, региона и инструментов. Процент подписки не вычисляется. Только доступные локальные журналы; импортированные сессии могут включать расход другой машины.' : 'Excludes fast/long-context, regional and tool surcharges. Subscription percentage is not calculated. Available local logs only; imported sessions may include another machine’s usage.'}</p></details></div>`;
+  return html + '</details>';
+}
+
 function renderDetail(id){
   const el = $("#page-" + id);
   const p = DATA && DATA.providers[id];
@@ -578,6 +633,7 @@ function renderDetail(id){
     }
   }
 
+  html += renderLocalUsage(id);
   // мета-инфо
   const metaBits = [];
   if(p.meta){
@@ -769,6 +825,7 @@ function renderSettings(){
       <div class="section">
         <div class="section-title">Private local history</div>
         <div class="toggle-row"><label>Store normalized usage snapshots locally</label><label class="switch"><input type="checkbox" id="cfg-history" ${cfg.history?.enabled !== false ? 'checked' : ''}><span class="slider"></span></label></div>
+        <div class="toggle-row"><label for="cfg-local-usage">${LANG === 'ru' ? 'Читать локальный расход токенов' : 'Read local token usage'}</label><label class="switch"><input type="checkbox" id="cfg-local-usage" ${cfg.local_usage?.enabled !== false ? 'checked' : ''}><span class="slider"></span></label></div>
         <div class="field"><label>Retention (days)</label><input type="number" id="cfg-retention" value="${cfg.history?.retention_days || 30}" min="1" max="365"></div>
         <div class="toggle-row"><label>Smart local alerts (opt in)</label><label class="switch"><input type="checkbox" id="cfg-alerts" ${cfg.alerts?.enabled ? 'checked' : ''}><span class="slider"></span></label></div>
         <div class="field"><label>Low remaining threshold (%)</label><input type="number" id="cfg-alert-threshold" value="${cfg.alerts?.remaining_threshold_pct || 15}" min="1" max="50"></div>
@@ -802,6 +859,7 @@ function renderSettings(){
         on_top: $("#cfg-ontop").checked,
       },
       history: {enabled: $("#cfg-history").checked, retention_days: parseInt($("#cfg-retention").value) || 30},
+      local_usage: {enabled: $("#cfg-local-usage").checked},
       alerts: {enabled: $("#cfg-alerts").checked, remaining_threshold_pct: parseInt($("#cfg-alert-threshold").value) || 15, cooldown_sec: cfg.alerts?.cooldown_sec || 3600},
     };
     const ok = await window.pywebview.api.save_config_api(newCfg);
@@ -971,7 +1029,7 @@ setTimeout(() => {
   const demo = new URLSearchParams(location.search).get("demo") || "ready";
   const missing = demo === "missing";
   const degraded = demo === "degraded";
-  DATA = {contract_version:1,app_version:"2.2.0",startup:{supported:true,enabled:false},_config:{language:"en",refresh_interval_sec:60,window:{width:380,height:600,on_top:true},history:{enabled:true,retention_days:30},alerts:{enabled:false,remaining_threshold_pct:15,cooldown_sec:3600}},updated_at: Date.now()/1000, providers: {
+  DATA = {contract_version:1,app_version:"2.3.0",startup:{supported:true,enabled:false},_config:{language:"en",refresh_interval_sec:60,window:{width:380,height:600,on_top:true},history:{enabled:true,retention_days:30},alerts:{enabled:false,remaining_threshold_pct:15,cooldown_sec:3600}},updated_at: Date.now()/1000, providers: {
     claude:{id:"claude",name:"Claude Code",ok:true,meta:{subscription:"max"},windows:[
       {id:"session",label:"Сессия (5 ч)",remaining_pct:64,resets_at:Date.now()/1000+7620},
       {id:"week",label:"Неделя",remaining_pct:41,resets_at:Date.now()/1000+3600*52},
@@ -984,6 +1042,15 @@ setTimeout(() => {
     codex:{cli:{state:"installed",version:"codex-cli 1.2.0",install_method:"standalone",path_conflict:false},auth:{state:"valid"},usage:{state:"available",stale:false},actions:[]}
   }}};
   LANG = "en";
+  if(demo === 'local-usage'){
+    DATA.providers.codex.meta.plan = 'prolite';
+    DATA.providers.codex.windows = [{id:'week', label:'Неделя', remaining_pct:82, resets_at:Date.now()/1000+550800}];
+    const sample = {input_tokens:1240000,output_tokens:85000,cache_read_tokens:980000,cache_write_tokens:0,event_count:24,unpriced_events:0,estimated_usd:7.83,models:['gpt-6-astra']};
+    DATA.local_usage = {enabled:true,pricing_date:'2026-09-14',providers:{}};
+    for(const pid of ['claude','codex']) DATA.local_usage.providers[pid] = {state:'available',today:sample,seven_days:{...sample,input_tokens:7340000,output_tokens:485000,cache_read_tokens:5500000,estimated_usd:48.15}};
+    DATA.local_usage.providers.claude = {state:'available',today:{...sample,models:['claude-opus-5'],estimated_usd:3.915},seven_days:{...DATA.local_usage.providers.codex.seven_days,models:['claude-opus-5'],estimated_usd:24.075}};
+  }
+  if(new URLSearchParams(location.search).get('lang') === 'ru') LANG = 'ru';
   updateTitles();
   renderAll();
   const screen = new URLSearchParams(location.search).get("screen");
@@ -992,7 +1059,7 @@ setTimeout(() => {
     const panel = $("#diagnostics-preview");
     if(panel) panel.style.display = "block";
     const text = $("#diagnostics-text");
-    if(text) text.value = `AI CLI Control Center diagnostics (redacted)\n{\n  "app": {"version": "2.2.0"},\n  "os": {"system": "Windows", "release": "11", "architecture": "AMD64"},\n  "providers": {\n    "claude": {"discovery_status": "installed", "cli_version": "2.1.226", "path_conflict_category": "none"},\n    "codex": {"discovery_status": "installed", "cli_version": "codex-cli 1.2.0", "path_conflict_category": "none"}\n  }\n}`;
+    if(text) text.value = `AI CLI Control Center diagnostics (redacted)\n{\n  "app": {"version": "2.3.0"},\n  "os": {"system": "Windows", "release": "11", "architecture": "AMD64"},\n  "providers": {\n    "claude": {"discovery_status": "installed", "cli_version": "2.1.226", "path_conflict_category": "none"},\n    "codex": {"discovery_status": "installed", "cli_version": "codex-cli 1.2.0", "path_conflict_category": "none"}\n  }\n}`;
   }
 }, 800);
 </script>

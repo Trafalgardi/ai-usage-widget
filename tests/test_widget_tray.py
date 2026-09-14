@@ -92,6 +92,16 @@ class TrayManagerTests(unittest.TestCase):
         self.assertIsNone(tray._get_tray_pcts()["claude"])
         self.assertIn("Claude 7d: —", tray._build_tooltip())
 
+    def test_codex_week_only_uses_week_in_tray_and_omits_five_hour_tooltip(self):
+        self.usage_snapshot()
+        windows = widget.STATE.snapshot["providers"]["codex"]["windows"]
+        windows.pop(0)
+        windows[0]["duration_seconds"] = 604800
+        tray = widget.TrayManager()
+        self.assertEqual(12.5, tray._get_tray_pcts()["codex"])
+        self.assertNotIn("Codex 5h", tray._build_tooltip())
+        self.assertIn("Codex 7d: 12.5%", tray._build_tooltip())
+
     @unittest.skipUnless(widget.TRAY_AVAILABLE, "pystray is optional")
     def test_menu_selection_updates_icons_and_checked_state(self):
         self.usage_snapshot()

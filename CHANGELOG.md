@@ -2,6 +2,28 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [2.3.0] - 2026-09-14
+
+### Added
+
+- Local input/output token accounting for Claude Code and Codex, covering today and the last seven local calendar days, including nested subagents and archived Codex sessions.
+- Collapsible provider cards with compact input/output totals; expand to inspect cache reads/writes, models, and standard short-context API cost estimates using the dated rate table.
+- Independent Settings switch for local token accounting, with missing-data and partial-coverage states. No conversation content or new token database is persisted.
+- Opt-in metadata-only reconciliation script and a design for future cross-machine comparison.
+
+### Fixed
+
+- Classify Codex windows by their reported duration, including weekly-only Pro Lite/x5 plans; do not label a weekly primary window as a five-hour session. The tray uses the available weekly window.
+- Account for modern Codex per-response usage records, including responses that never update the UI token counter; deduplicate copied responses by response ID and retain legacy-format support.
+- Ignore Claude zeroed auxiliary streaming blocks and avoid marking the current period partial because of invalid historical records outside that period.
+- Apply the correct light-theme colors to Claude token and Provider Health cards, while retaining Codex's dark theme.
+
+### Validation
+
+- Reconciled a frozen, metadata-only local sample against an independent per-response calculation: zero differences in input, output and cache totals for both providers and both periods; Decimal cost arithmetic also matched.
+- Added regression coverage for duplicate responses, CLI format upgrades, model switches, cache-write durations, timezone/day boundaries and malformed records.
+- Costs remain a standard short-context API equivalent, not a subscription bill or subscription-limit percentage. Fast/long-context, regional and tool surcharges are excluded; unknown model rates remain unpriced.
+
 ## [2.2.0] - 2026-09-09
 
 ### Added
