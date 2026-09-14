@@ -77,3 +77,23 @@ the owner's running copy were not changed or stopped.
 ```
 
 [Download v2.2.0](https://github.com/Trafalgardi/ai-usage-widget/releases/tag/v2.2.0).
+
+## Public v2.3.0 audit — 2026-09-14
+
+- Release source: annotated tag `v2.3.0`, commit `7ea28aea1150f488a13c91d2a366b9553c8cb02c`.
+- Independent, metadata-only reconciliation of 47 Claude files and 8 Codex files found zero input/output/cache differences for today and seven days after fixing omitted modern Codex responses. Decimal cost arithmetic matched. No private usage totals or conversation content were committed.
+- All 91 unit tests passed locally. Windows/Linux tests and the Windows production build passed in workflow `34840352702`.
+- Local production EXE passed headless and hidden WebView lifecycle smoke checks.
+- Tagged release workflow `34840522746` passed build, smoke, SBOM, provenance and artifact upload.
+- Downloaded workflow EXE passed hidden WebView smoke; ZIP-extracted EXE passed headless smoke. The checksum file and ZIP-extracted EXE matched the downloaded artifacts.
+- `gh attestation verify` succeeded with the expected repository, `refs/tags/v2.3.0`, source digest `7ea28aea1150f488a13c91d2a366b9553c8cb02c`, and `release-artifacts.yml` signer workflow.
+- All five uploaded GitHub asset digests matched the verified local files before publishing the release and marking it Latest.
+- Microsoft Defender remained unavailable on this host (`Provider load failure`). No antivirus scan result is claimed; the executable remains unsigned.
+- Costs are explicitly standard short-context API equivalents. No claim is made that available local logs equal complete provider billing or a subscription quota percentage.
+
+```
+5baf3b4c54c6b9e5c082095a81c2a8a8ca638828f4e5f52f26c539fd1a6bdda2  AI-CLI-Control-Center.exe
+1d9e395bf4763f9cacbadf476bf656fa1b6f5cb3aa50ac6fc845d9dd4732b0b4  AI-CLI-Control-Center-v2.3.0-windows-x64.zip
+```
+
+[Download v2.3.0](https://github.com/Trafalgardi/ai-usage-widget/releases/tag/v2.3.0).

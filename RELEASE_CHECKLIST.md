@@ -35,6 +35,15 @@ This file is a status record, not an unreviewed list of empty boxes. Detailed pu
 
 ## Launch
 
+### v2.3.0 release record
+
+- [x] Local accounting reconciled against frozen per-response metadata; omitted Codex usage fixed before release.
+- [x] Version/changelog, 91 unit tests, compileall and local links checked.
+- [x] Local build and both packaged smoke modes passed; Windows/Linux CI and tagged artifact workflow passed.
+- [x] Workflow EXE/ZIP checksums, extracted EXE, hidden WebView/headless smoke and exact tag/commit provenance verified.
+- [x] All five asset digests verified and v2.3.0 published as Latest.
+- [ ] Defender scan unavailable on this host; no antivirus scan or Authenticode signing claim is made.
+
 - [ ] Publish a short demo showing `CLI not found → Install → Ready`.
 - [ ] Announce the release with the Control Center positioning, trust boundaries, unsigned/signed status, and direct release link.
 - [ ] Monitor issues for installer, PATH, WebView2, and usage-endpoint regressions.
